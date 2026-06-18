@@ -1,0 +1,57 @@
+# Fake News Detection (Разпознаване на фалшиви новини)
+
+Binary text classification that decides whether a news article is **fake** (`0`)
+or **real** (`1`). The project follows the course modelling story: a
+majority-class **baseline**, an LSTM **main model**, two simple **improvements**,
+a coloured Excel **Model Report File**, and full BDD unit-test coverage.
+
+## Quick start
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Run the whole pipeline (baseline -> LSTM -> improvements -> report + figures).
+python run.py
+```
+
+If the ISOT dataset is not present the pipeline falls back to a small synthetic
+corpus so it runs out of the box. To use the real data, download the
+[ISOT Fake and Real News dataset](https://www.kaggle.com/datasets/clmentbisaillon/fake-and-real-news-dataset)
+and place `Fake.csv` and `True.csv` under `data/raw/`.
+
+## Running the experiments individually
+
+```bash
+python experiments/exp_01_baseline.py      # resets the ledger, writes row 1
+python experiments/exp_02_lstm.py          # main model
+python experiments/exp_03_lstm_dropout.py  # improvement 1
+python experiments/exp_04_bilstm.py        # improvement 2
+python experiments/exp_05_transformer.py   # optional DistilBERT stretch
+```
+
+Each script appends a row to `reports/records.jsonl` and rebuilds
+`reports/model_report.xlsx`.
+
+## Tests
+
+```bash
+coverage run -m pytest
+coverage report -m
+```
+
+The suite uses behaviour-driven naming (`test_when_<condition>_then_<expectation>`)
+and reaches 100% coverage of the `src` package.
+
+## Layout
+
+```
+src/fake_news/        library code (data, models, training, reporting)
+experiments/          one runnable script per experiment
+tests/                BDD unit tests
+reports/              generated Excel report and figures
+docs/documentation.md full project documentation
+```
+
+See [docs/documentation.md](docs/documentation.md) for the full write-up.

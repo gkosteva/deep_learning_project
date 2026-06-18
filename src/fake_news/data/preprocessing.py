@@ -1,0 +1,107 @@
+"""Text preprocessing: cleaning, source-leakage removal, tokenisation and vocab.
+
+The ISOT corpus has a well-documented quirk: the real (Reuters) articles almost
+always begin with a dateline such as ``WASHINGTON (Reuters) -``. A model can
+reach near-perfect accuracy just by detecting that token, which does not
+generalise. ``strip_source_leakage`` removes it so the model must learn from the
+actual language.
+"""
+import re
+from collections import Counter
+from typing import Dict, List
+
+PAD_TOKEN = '<pad>'
+UNK_TOKEN = '<unk>'
+
+_REUTERS_DATELINE = re.compile(r'^.*?\(Reuters\)\s*-\s*', flags=re.IGNORECASE)
+_URL = re.compile(r'https?://\S+|www\.\S+')
+_NON_LETTER = re.compile(r"[^a-z\s']")
+_MULTISPACE = re.compile(r'\s+')
+
+
+def strip_source_leakage(text: str) -> str:
+    """Remove the leading ``... (Reuters) -`` dateline if present."""
+    return _REUTERS_DATELINE.sub('', text, count=1)
+
+
+def clean_text(text: str, strip_leakage: bool = True) -> str:
+    """Lowercase, drop URLs/punctuation and collapse whitespace.
+
+    When ``strip_leakage`` is True the Reuters dateline is removed first.
+    """
+    if text is None:
+        raise ValueError('text must not be None')
+    if strip_leakage:
+        text = strip_source_leakage(text)
+    text = text.lower()
+    text = _URL.sub(' ', text)
+    text = _NON_LETTER.sub(' ', text)
+    text = _MULTISPACE.sub(' ', text)
+    return text.strip()
+
+
+def tokenize(text: str) -> List[str]:
+    """Split cleaned text into whitespace-delimited tokens."""
+    cleaned = clean_text(text)
+    if not cleaned:
+        return []
+    return cleaned.split(' ')
+
+
+class Vocabulary:
+    """Maps tokens to integer ids, reserving slots for padding and unknowns."""
+
+    def __init__(self, token_to_id: Dict[str, int]):
+        if PAD_TOKEN not in token_to_id or UNK_TOKEN not in token_to_id:
+            raise ValueError('vocabulary must contain pad and unk tokens')
+        self.token_to_id = token_to_id
+        self.id_to_token = {index: token for token, index in token_to_id.items()}
+
+    def __len__(self) -> int:
+        return len(self.token_to_id)
+
+    @property
+    def pad_id(self) -> int:
+        return self.token_to_id[PAD_TOKEN]
+
+    @property
+    def unk_id(self) -> int:
+        return self.token_to_id[UNK_TOKEN]
+
+    def encode(self, text: str, max_length: int) -> List[int]:
+        """Encode ``text`` into a fixed-length list of token ids.
+
+        Sequences longer than ``max_length`` are truncated; shorter ones are
+        right-padded with the pad id.
+        """
+        if max_length <= 0:
+            raise ValueError('max_length must be positive')
+        ids = [self.token_to_id.get(token, self.unk_id) for token in tokenize(text)]
+        ids = ids[:max_length]
+        padding = [self.pad_id] * (max_length - len(ids))
+        return ids + padding
+
+    @classmethod
+    def build(
+        cls,
+        texts: List[str],
+        max_size: int = 20000,
+        min_frequency: int = 1,
+    ) -> 'Vocabulary':
+        """Build a vocabulary from a corpus of raw texts.
+
+        Tokens are ordered by descending frequency; ties are broken
+        alphabetically so the result is deterministic.
+        """
+        counter: Counter = Counter()
+        for text in texts:
+            counter.update(tokenize(text))
+
+        token_to_id = {PAD_TOKEN: 0, UNK_TOKEN: 1}
+        eligible = [(token, count) for token, count in counter.items() if count >= min_frequency]
+        eligible.sort(key=lambda item: (-item[1], item[0]))
+        for token, _ in eligible:
+            if len(token_to_id) >= max_size:
+                break
+            token_to_id[token] = len(token_to_id)
+        return cls(token_to_id)

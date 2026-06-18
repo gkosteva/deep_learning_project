@@ -1,0 +1,18 @@
+# Runtime
+numpy
+pandas
+scikit-learn
+matplotlib
+openpyxl
+tqdm
+torch
+# Optional stretch model (DistilBERT fine-tuning)
+transformers
+datasets
+evaluate
+# Development
+coverage
+pytest
+yapf
+isort
+mypy

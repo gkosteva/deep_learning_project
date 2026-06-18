@@ -1,0 +1,49 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+coverage.xml
+.pytest_cache/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+
+# Datasets (downloaded locally, not committed)
+data/raw/*.csv
+data/processed/
+
+# Generated reports and figures
+reports/*.xlsx
+reports/records.jsonl
+reports/figures/*.png
+
+# Hugging Face caches
+.cache/
+~/.cache/huggingface/
+
+# MacOS
+.DS_Store
