@@ -40,6 +40,21 @@ class TestGenerateSyntheticDataset(unittest.TestCase):
         self.assertEqual((frame['label'] == 0).sum(), 10)
         self.assertEqual((frame['label'] == 1).sum(), 10)
 
+    def test_when_noise_is_zero_then_labels_stay_balanced(self):
+        frame = generate_synthetic_dataset(n_per_class=8, seed=1, noise=0.0)
+        self.assertEqual((frame['label'] == 0).sum(), 8)
+        self.assertEqual((frame['label'] == 1).sum(), 8)
+
+    def test_when_noise_is_one_then_labels_stay_balanced(self):
+        frame = generate_synthetic_dataset(n_per_class=8, seed=1, noise=1.0)
+        self.assertEqual((frame['label'] == 0).sum(), 8)
+        self.assertEqual((frame['label'] == 1).sum(), 8)
+
+    def test_when_called_then_tokens_are_alphabetic(self):
+        frame = generate_synthetic_dataset(n_per_class=5, seed=1)
+        tokens = ' '.join(frame['text'].tolist()).split()
+        self.assertTrue(all(token.isalpha() for token in tokens))
+
 
 class TestStratifiedSplit(unittest.TestCase):
 

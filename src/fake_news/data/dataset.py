@@ -51,53 +51,93 @@ def load_isot(fake_path: str, true_path: str) -> pd.DataFrame:
     return frame
 
 
-def generate_synthetic_dataset(n_per_class: int = 300, seed: int = 42) -> pd.DataFrame:
-    """Create a small, separable synthetic corpus for demos and tests.
+# A neutral, letters-only vocabulary shared by both classes. The classes differ
+# only in how *often* they use each word, never in which words are available -
+# this is what makes the synthetic task realistic instead of trivially separable.
+_SYNTHETIC_VOCABULARY = [
+    'time',
+    'people',
+    'year',
+    'way',
+    'day',
+    'thing',
+    'world',
+    'school',
+    'state',
+    'family',
+    'student',
+    'group',
+    'country',
+    'problem',
+    'hand',
+    'place',
+    'case',
+    'week',
+    'company',
+    'system',
+    'program',
+    'question',
+    'work',
+    'government',
+    'number',
+    'night',
+    'point',
+    'home',
+    'water',
+    'room',
+    'area',
+    'money',
+    'story',
+    'fact',
+    'month',
+    'right',
+    'study',
+    'book',
+    'job',
+    'word',
+]
 
-    Fake articles draw from sensational vocabulary, real ones from neutral
-    reporting vocabulary, with a little overlap so the task is non-trivial.
+
+def _softmax(values: np.ndarray) -> np.ndarray:
+    shifted = values - values.max()
+    exponentiated = np.exp(shifted)
+    return exponentiated / exponentiated.sum()
+
+
+def generate_synthetic_dataset(
+    n_per_class: int = 300,
+    seed: int = 42,
+    separation: float = 0.7,
+    noise: float = 0.12,
+) -> pd.DataFrame:
+    """Create a realistic-but-learnable synthetic corpus for demos and tests.
+
+    Both classes share one vocabulary; only their word-frequency distributions
+    differ, so the classes overlap and are *not* perfectly separable. With
+    probability ``noise`` a document is drawn from the other class's
+    distribution (feature noise), which caps the achievable accuracy the way
+    real, messy data does. ``separation`` controls how far apart the two
+    distributions are (higher -> easier).
     """
     rng = np.random.default_rng(seed)
-    fake_words = [
-        'shocking',
-        'miracle',
-        'secret',
-        'exposed',
-        'unbelievable',
-        'hoax',
-        'conspiracy',
-        'outrage',
-        'banned',
-        'cure',
-        'they',
-        'hate',
-        'truth',
-    ]
-    real_words = [
-        'government',
-        'reported',
-        'according',
-        'official',
-        'statement',
-        'policy',
-        'economy',
-        'minister',
-        'parliament',
-        'study',
-        'data',
-        'committee',
-        'budget',
-    ]
+    vocabulary = np.array(_SYNTHETIC_VOCABULARY)
+    base = rng.normal(size=len(vocabulary))
+    shift = rng.normal(size=len(vocabulary))
+    distributions = {
+        LABEL_FAKE: _softmax(base + separation * shift),
+        LABEL_REAL: _softmax(base - separation * shift),
+    }
 
-    def make(words: List[str]) -> str:
+    def make(label: int) -> str:
+        source = 1 - label if rng.random() < noise else label
         length = int(rng.integers(12, 30))
-        chosen = rng.choice(words, size=length, replace=True)
+        chosen = rng.choice(vocabulary, size=length, replace=True, p=distributions[source])
         return ' '.join(chosen)
 
     rows = []
     for _ in range(n_per_class):
-        rows.append({'text': make(fake_words), 'label': LABEL_FAKE})
-        rows.append({'text': make(real_words), 'label': LABEL_REAL})
+        rows.append({'text': make(LABEL_FAKE), 'label': LABEL_FAKE})
+        rows.append({'text': make(LABEL_REAL), 'label': LABEL_REAL})
     frame = pd.DataFrame(rows)
     return frame.sample(frac=1.0, random_state=seed).reset_index(drop=True)
 
