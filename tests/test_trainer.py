@@ -51,6 +51,13 @@ class TestTrainerFit(unittest.TestCase):
         history = self.trainer.fit(_make_loader(), _make_loader(), epochs=10, patience=1)
         self.assertLessEqual(len(history.train_loss), 10)
 
+    def test_when_weight_decay_set_then_training_still_runs(self):
+        torch.manual_seed(0)
+        model = LSTMClassifier(vocab_size=20, embedding_dim=8, hidden_size=8)
+        trainer = Trainer(model, learning_rate=1e-2, device=torch.device('cpu'), weight_decay=0.01)
+        history = trainer.fit(_make_loader(), _make_loader(), epochs=1, patience=1)
+        self.assertEqual(len(history.train_loss), 1)
+
 
 class TestTrainerPredict(unittest.TestCase):
 

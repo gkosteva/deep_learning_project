@@ -1,9 +1,12 @@
 """LSTM-based text classifier - the project's main model.
 
-The same class covers the two chosen improvements: ``dropout`` adds
-regularisation and ``bidirectional=True`` turns it into a BiLSTM. This keeps the
-modelling story in a single, well-tested component.
+The same class covers the chosen improvements: ``dropout`` adds regularisation,
+``bidirectional=True`` turns it into a BiLSTM, and ``pretrained_embeddings``
+initialises the embedding layer from GloVe vectors. This keeps the modelling
+story in a single, well-tested component.
 """
+from typing import Optional
+
 import torch
 import torch.nn as nn
 
@@ -21,6 +24,8 @@ class LSTMClassifier(nn.Module):
         bidirectional: bool = False,
         dropout: float = 0.0,
         pad_id: int = 0,
+        pretrained_embeddings: Optional[torch.Tensor] = None,
+        freeze_embeddings: bool = False,
     ):
         super().__init__()
         if vocab_size <= 0:
@@ -30,6 +35,9 @@ class LSTMClassifier(nn.Module):
 
         self.pad_id = pad_id
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=pad_id)
+        if pretrained_embeddings is not None:
+            self._load_pretrained_embeddings(pretrained_embeddings, vocab_size, embedding_dim,
+                                             freeze_embeddings)
         self.lstm = nn.LSTM(
             input_size=embedding_dim,
             hidden_size=hidden_size,
@@ -41,6 +49,16 @@ class LSTMClassifier(nn.Module):
         self.dropout = nn.Dropout(dropout)
         directions = 2 if bidirectional else 1
         self.classifier = nn.Linear(hidden_size * directions, num_classes)
+
+    def _load_pretrained_embeddings(self, weights: torch.Tensor, vocab_size: int,
+                                    embedding_dim: int, freeze: bool) -> None:
+        if tuple(weights.shape) != (vocab_size, embedding_dim):
+            raise ValueError(f'pretrained embeddings have shape {tuple(weights.shape)}, '
+                             f'expected {(vocab_size, embedding_dim)}')
+        with torch.no_grad():
+            self.embedding.weight.copy_(weights)
+            self.embedding.weight[self.pad_id].zero_()
+        self.embedding.weight.requires_grad = not freeze
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         """Map a batch of ``(batch, seq_len)`` token ids to class logits.

@@ -31,6 +31,33 @@ class TestLSTMClassifierForward(unittest.TestCase):
         self.assertEqual(tuple(logits.shape), (3, 2))
 
 
+class TestLSTMClassifierPretrainedEmbeddings(unittest.TestCase):
+
+    def test_when_shape_mismatch_then_value_error_is_raised(self):
+        weights = torch.randn(5, 8)
+        with self.assertRaises(ValueError):
+            LSTMClassifier(vocab_size=20, embedding_dim=8, pretrained_embeddings=weights)
+
+    def test_when_given_then_embedding_rows_are_copied(self):
+        weights = torch.randn(20, 8)
+        model = LSTMClassifier(vocab_size=20,
+                               embedding_dim=8,
+                               hidden_size=8,
+                               pad_id=0,
+                               pretrained_embeddings=weights)
+        torch.testing.assert_close(model.embedding.weight.data[3], weights[3])
+        self.assertTrue(torch.all(model.embedding.weight.data[0] == 0))
+
+    def test_when_frozen_then_embedding_is_not_trainable(self):
+        weights = torch.randn(20, 8)
+        model = LSTMClassifier(vocab_size=20,
+                               embedding_dim=8,
+                               hidden_size=8,
+                               pretrained_embeddings=weights,
+                               freeze_embeddings=True)
+        self.assertFalse(model.embedding.weight.requires_grad)
+
+
 class TestLSTMClassifierCountParameters(unittest.TestCase):
 
     def test_when_called_then_returns_positive_count(self):

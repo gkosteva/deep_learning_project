@@ -10,6 +10,9 @@ class TestLSTMConfig(unittest.TestCase):
         self.assertIn('hidden_size', columns)
         self.assertIn('bidirectional', columns)
 
+    def test_when_as_report_columns_then_includes_weight_decay(self):
+        self.assertIn('weight_decay', LSTMConfig().as_report_columns())
+
 
 class TestTransformerConfig(unittest.TestCase):
 

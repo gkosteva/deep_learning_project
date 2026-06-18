@@ -41,10 +41,15 @@ class Trainer:
         learning_rate: float = 1e-3,
         device: Optional[torch.device] = None,
         positive_label: int = 0,
+        weight_decay: float = 0.0,
     ):
         self.device = device or select_device()
         self.model = model.to(self.device)
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        # AdamW decouples weight decay from the gradient update; with
+        # weight_decay=0.0 it matches plain Adam.
+        self.optimizer = torch.optim.AdamW(model.parameters(),
+                                           lr=learning_rate,
+                                           weight_decay=weight_decay)
         self.criterion = nn.CrossEntropyLoss()
         self.positive_label = positive_label
 

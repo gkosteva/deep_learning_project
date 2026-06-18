@@ -20,6 +20,8 @@ class DataConfig:
     max_vocab_size: int = 20000
     min_token_frequency: int = 2
     max_sequence_length: int = 200
+    glove_path: str = 'data/raw/glove.6B.100d.txt'
+    glove_dim: int = 100
 
 
 @dataclass
@@ -31,6 +33,7 @@ class LSTMConfig:
     num_layers: int = 1
     bidirectional: bool = False
     dropout: float = 0.0
+    weight_decay: float = 0.0
     learning_rate: float = 1e-3
     batch_size: int = 64
     epochs: int = 5
@@ -44,6 +47,7 @@ class LSTMConfig:
             'num_layers': self.num_layers,
             'bidirectional': self.bidirectional,
             'dropout': self.dropout,
+            'weight_decay': self.weight_decay,
             'learning_rate': self.learning_rate,
             'batch_size': self.batch_size,
             'epochs': self.epochs,

@@ -18,7 +18,9 @@ modelling story required by the course:
    class). Every later model is measured against it.
 2. **Main model** - an LSTM classifier built in PyTorch.
 3. **Improvements** - we list candidate ideas as bullet points and implement the
-   **two simplest** ones, recording each as a new row in the report.
+   **two simplest** ones first (dropout, bidirectional), then further
+   capacity/regularisation/transfer experiments (wider & deeper BiLSTM, AdamW
+   weight decay, GloVe-initialised embeddings), recording each as a new row.
 4. **Stretch** - a fine-tuned DistilBERT transformer.
 
 Each trained model becomes one row of the Excel **Model Report File**, which
@@ -57,6 +59,9 @@ baseline.
 | Main model         | LSTM with masked mean-pooling over real tokens                |
 | Improvement 1      | Dropout regularisation                                        |
 | Improvement 2      | Bidirectional LSTM (BiLSTM)                                    |
+| Improvement 3      | Wider & deeper BiLSTM (more capacity, 2 layers)               |
+| Improvement 4      | AdamW with weight decay (decoupled L2 regularisation)         |
+| Improvement 5      | GloVe-initialised embeddings, fine-tuned (transfer learning)  |
 | Stretch model      | DistilBERT fine-tuning (HuggingFace `transformers`)           |
 | Optimiser / loss   | Adam / cross-entropy                                          |
 | Metrics            | Accuracy, F1 (main), Recall                                   |
@@ -138,10 +143,22 @@ highlights it automatically. A representative run on the synthetic corpus:
 | LSTM (main model) | 0.78 | 0.77 |
 | LSTM + dropout | 0.78 | 0.77 |
 | BiLSTM + dropout (best) | 0.81 | 0.81 |
+| Wider & deeper BiLSTM | 0.80 | 0.80 |
+| Wider BiLSTM + AdamW weight decay | 0.80 | 0.80 |
+| BiLSTM + GloVe (fine-tuned) | 0.80 | 0.80 |
 
-Scores are high but imperfect, and the improvements are distinguishable. On the
-real ISOT data the same ordering is expected, with the DistilBERT stretch row
-typically the strongest.
+Scores are high but imperfect, and the improvements are distinguishable. A useful
+finding the report makes honest: on this small corpus the **extra capacity does
+not help** - the wider/deeper BiLSTM and the weight-decay variant land slightly
+below the simpler BiLSTM + dropout, which stays the best model. "Bigger is not
+always better" is itself a result worth reporting.
+
+**On GloVe:** the demo runs with *synthetic* stand-in vectors (no download), so
+the GloVe row reflects plumbing, not real transfer learning. The genuine benefit
+- better generalisation on rare/unseen words, faster convergence - appears once
+`glove.6B.100d.txt` is placed under `data/raw/` and the real ISOT corpus is used.
+On the larger, noisier real data the extra-capacity and GloVe rows are expected
+to close or reverse the gap, with the DistilBERT stretch row typically strongest.
 
 ## 6. Graphics
 

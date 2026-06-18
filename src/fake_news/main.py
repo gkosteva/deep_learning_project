@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from .config import ExperimentConfig, LSTMConfig
 from .data.dataset import (FakeNewsDataset, generate_synthetic_dataset, load_isot,
                            stratified_split)
+from .data.embeddings import build_embedding_matrix, load_or_synthesize_glove
 from .data.preprocessing import Vocabulary
 from .models.baseline import MajorityClassClassifier
 from .models.lstm_classifier import LSTMClassifier
@@ -59,6 +60,8 @@ def run_lstm_experiment(
     config: ExperimentConfig,
     comment: str,
     device: Optional[torch.device] = None,
+    pretrained_embeddings: Optional[torch.Tensor] = None,
+    freeze_embeddings: bool = False,
 ) -> Tuple[ExperimentRecord, TrainingHistory, List[int], List[int]]:
     """Train one LSTM variant and return its report record plus diagnostics."""
     torch.manual_seed(config.data.seed)
@@ -91,11 +94,14 @@ def run_lstm_experiment(
         bidirectional=lstm_config.bidirectional,
         dropout=lstm_config.dropout,
         pad_id=vocabulary.pad_id,
+        pretrained_embeddings=pretrained_embeddings,
+        freeze_embeddings=freeze_embeddings,
     )
     trainer = Trainer(model,
                       lstm_config.learning_rate,
                       device=device,
-                      positive_label=POSITIVE_LABEL)
+                      positive_label=POSITIVE_LABEL,
+                      weight_decay=lstm_config.weight_decay)
     history = trainer.fit(train_loader, val_loader, lstm_config.epochs, lstm_config.patience)
     references, predictions = trainer.predict(test_loader)
     metrics = evaluate_classification(references, predictions, POSITIVE_LABEL)
@@ -139,6 +145,12 @@ def run(config: Optional[ExperimentConfig] = None) -> int:
         ))
 
     base = config.lstm
+    bigger = replace(base,
+                     embedding_dim=128,
+                     hidden_size=128,
+                     num_layers=2,
+                     bidirectional=True,
+                     dropout=0.3)
     experiments = [
         ('LSTM (main model)', base,
          'Embedding + single-layer LSTM. First real model in the journey.'),
@@ -146,19 +158,23 @@ def run(config: Optional[ExperimentConfig] = None) -> int:
          'Improvement 1: dropout 0.3 regularises the network to fight overfitting.'),
         ('BiLSTM + dropout', replace(base, dropout=0.3, bidirectional=True),
          'Improvement 2: bidirectional LSTM reads context both ways for richer features.'),
+        ('Wider & deeper BiLSTM', bigger,
+         'Improvement 3: more capacity - wider embeddings/hidden state and a second '
+         'LSTM layer.'),
+        ('Wider BiLSTM + AdamW weight decay', replace(bigger, weight_decay=0.01),
+         'Improvement 4: AdamW weight decay 0.01 regularises the larger model.'),
     ]
 
-    best_history: Optional[TrainingHistory] = None
-    best_refs: List[int] = []
-    best_preds: List[int] = []
-    best_f1 = -1.0
-    for name, lstm_config, comment in experiments:
-        record, history, refs, preds = run_lstm_experiment(name, lstm_config, splits, vocabulary,
-                                                           config, comment)
+    results = [
+        run_lstm_experiment(name, lstm_config, splits, vocabulary, config, comment)
+        for name, lstm_config, comment in experiments
+    ]
+    results.append(_run_glove_experiment(config, splits, vocabulary))
+    for record, _, _, _ in results:
         report.add(record)
-        if record.metrics['f1'] > best_f1:
-            best_f1 = record.metrics['f1']
-            best_history, best_refs, best_preds = history, refs, preds
+
+    best_index = max(range(len(results)), key=lambda i: results[i][0].metrics['f1'])
+    _, best_history, best_refs, best_preds = results[best_index]
 
     diagram_paths = _generate_figures(config, splits, best_history, best_refs, best_preds)
     examples = _collect_examples(splits[2][0], best_refs, best_preds)
@@ -167,6 +183,31 @@ def run(config: Optional[ExperimentConfig] = None) -> int:
                               examples=examples)
     print(f'Report written to {report_path}.')
     return 0
+
+
+def _run_glove_experiment(config: ExperimentConfig, splits, vocabulary: Vocabulary):
+    """Build a GloVe-initialised BiLSTM experiment (improvement 5)."""
+    vectors, source = load_or_synthesize_glove(config.data.glove_path, vocabulary,
+                                               config.data.glove_dim, config.data.seed)
+    matrix = build_embedding_matrix(vocabulary, vectors, config.data.glove_dim, config.data.seed)
+    embeddings = torch.tensor(matrix)
+    glove_config = replace(config.lstm,
+                           embedding_dim=config.data.glove_dim,
+                           hidden_size=128,
+                           bidirectional=True,
+                           dropout=0.3)
+    record, history, references, predictions = run_lstm_experiment(
+        'BiLSTM + GloVe (fine-tuned)',
+        glove_config,
+        splits,
+        vocabulary,
+        config,
+        f'Improvement 5: embedding layer initialised from GloVe ({source}) vectors '
+        'and fine-tuned.',
+        pretrained_embeddings=embeddings,
+    )
+    record.hyperparameters['embeddings'] = f'glove-{source}'
+    return record, history, references, predictions
 
 
 def _generate_figures(config, splits, history, references, predictions) -> List[str]:

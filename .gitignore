@@ -32,8 +32,9 @@ ENV/
 .mypy_cache/
 .dmypy.json
 
-# Datasets (downloaded locally, not committed)
+# Datasets and embeddings (downloaded locally, not committed)
 data/raw/*.csv
+data/raw/*.txt
 data/processed/
 
 # Generated reports and figures
