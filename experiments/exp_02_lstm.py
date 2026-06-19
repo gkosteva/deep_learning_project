@@ -1,4 +1,3 @@
-"""Experiment 02 - the main model: a single-layer LSTM classifier."""
 from _common import LEDGER_PATH, REPORT_PATH, prepare
 
 from src.fake_news.config import LSTMConfig

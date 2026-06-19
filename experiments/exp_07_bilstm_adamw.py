@@ -1,4 +1,3 @@
-"""Experiment 07 - improvement 4: the wider BiLSTM regularised with AdamW weight decay."""
 from _common import LEDGER_PATH, REPORT_PATH, prepare
 
 from src.fake_news.config import LSTMConfig

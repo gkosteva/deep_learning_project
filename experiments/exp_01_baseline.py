@@ -1,7 +1,3 @@
-"""Experiment 01 - majority-class baseline (row one of the report).
-
-This script resets the ledger so the baseline always starts a fresh report.
-"""
 import os
 
 from _common import LEDGER_PATH, REPORT_PATH, prepare

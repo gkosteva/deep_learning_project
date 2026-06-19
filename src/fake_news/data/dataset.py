@@ -1,13 +1,3 @@
-"""Loading, splitting and tensorising the ISOT fake-news corpus.
-
-Labels follow the convention used throughout the project:
-
-* ``0`` -> fake news
-* ``1`` -> real news
-
-A synthetic generator is provided so the full pipeline (and the test-suite) can
-run end to end without downloading the ~44k-article dataset.
-"""
 import os
 from typing import List, Tuple
 
@@ -30,10 +20,6 @@ def _combine_title_and_text(frame: pd.DataFrame) -> pd.Series:
 
 
 def load_isot(fake_path: str, true_path: str) -> pd.DataFrame:
-    """Load and merge the ISOT ``Fake.csv`` and ``True.csv`` files.
-
-    Returns a frame with two columns: ``text`` and ``label``.
-    """
     if not os.path.exists(fake_path):
         raise FileNotFoundError(f'fake news file not found: {fake_path}')
     if not os.path.exists(true_path):
@@ -51,9 +37,7 @@ def load_isot(fake_path: str, true_path: str) -> pd.DataFrame:
     return frame
 
 
-# A neutral, letters-only vocabulary shared by both classes. The classes differ
-# only in how *often* they use each word, never in which words are available -
-# this is what makes the synthetic task realistic instead of trivially separable.
+# A neutral, letters-only vocabulary shared by both classes
 _SYNTHETIC_VOCABULARY = [
     'time',
     'people',
@@ -110,15 +94,6 @@ def generate_synthetic_dataset(
     separation: float = 0.7,
     noise: float = 0.12,
 ) -> pd.DataFrame:
-    """Create a realistic-but-learnable synthetic corpus for demos and tests.
-
-    Both classes share one vocabulary; only their word-frequency distributions
-    differ, so the classes overlap and are *not* perfectly separable. With
-    probability ``noise`` a document is drawn from the other class's
-    distribution (feature noise), which caps the achievable accuracy the way
-    real, messy data does. ``separation`` controls how far apart the two
-    distributions are (higher -> easier).
-    """
     rng = np.random.default_rng(seed)
     vocabulary = np.array(_SYNTHETIC_VOCABULARY)
     base = rng.normal(size=len(vocabulary))
@@ -148,7 +123,6 @@ def stratified_split(
     test_size: float,
     seed: int,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Split ``frame`` into train/val/test preserving the class ratio."""
     if not 0 < test_size < 1:
         raise ValueError('test_size must be in (0, 1)')
     if not 0 < val_size < 1:
@@ -177,7 +151,6 @@ def stratified_split(
 
 
 class FakeNewsDataset(Dataset):
-    """Encodes raw texts into fixed-length id tensors for the LSTM models."""
 
     def __init__(
         self,

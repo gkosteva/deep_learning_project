@@ -13,11 +13,19 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Run the whole pipeline (baseline -> LSTM -> improvements -> report + figures).
-python run.py
+python run.py                  # auto: real data if present, else synthetic
+python run.py --data real      # ISOT real data only (errors if CSVs are missing)
+python run.py --data synthetic # generated synthetic corpus only
 ```
 
-If the ISOT dataset is not present the pipeline falls back to a small synthetic
-corpus so it runs out of the box. To use the real data, download the
+`--data` selects the corpus and keeps the two runs separate: results are written
+to `reports/model_report_<source>.xlsx` (e.g. `model_report_isot.xlsx` or
+`model_report_synthetic.xlsx`) with figures under `reports/figures/<source>/`,
+and the data source is recorded in the report title and a `data` column. The
+default `auto` falls back to a small synthetic corpus when the ISOT files are
+absent so it runs out of the box.
+
+To use the real data, download the
 [ISOT Fake and Real News dataset](https://www.kaggle.com/datasets/clmentbisaillon/fake-and-real-news-dataset)
 and place `Fake.csv` and `True.csv` under `data/raw/`.
 

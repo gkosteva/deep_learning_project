@@ -1,14 +1,3 @@
-"""Builds the coloured Excel Model Report File described in the course notes.
-
-The report tells the story of the modelling journey:
-
-* one row per experiment, kept in creation order (never re-sorted);
-* hyperparameter columns first, then up to three metric columns, each showing
-  the value and its percentage change versus the baseline;
-* a ``Comments`` column for interpretation / error analysis;
-* a highlighted cell that names the best model and why;
-* extra sheets for the train-vs-validation diagrams and best-model examples.
-"""
 import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -34,8 +23,6 @@ _BORDER = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
 
 @dataclass
 class ExperimentRecord:
-    """A single trained-and-evaluated model (one row of the report)."""
-
     name: str
     hyperparameters: Dict[str, object] = field(default_factory=dict)
     metrics: Dict[str, float] = field(default_factory=dict)
@@ -43,7 +30,6 @@ class ExperimentRecord:
 
 
 class ModelReport:
-    """Accumulates experiment records and renders them to a styled workbook."""
 
     def __init__(self, title: str = 'Model Report - Fake News Detection', main_metric: str = 'f1'):
         if main_metric not in METRIC_KEYS:
@@ -63,7 +49,6 @@ class ModelReport:
         return self.records[0]
 
     def percent_change(self, record: ExperimentRecord, metric: str) -> float:
-        """Percentage change of ``metric`` versus the baseline model."""
         baseline_value = self.baseline.metrics.get(metric, 0.0)
         value = record.metrics.get(metric, 0.0)
         if baseline_value == 0:
@@ -71,7 +56,6 @@ class ModelReport:
         return (value - baseline_value) / baseline_value * 100.0
 
     def best_record_index(self) -> int:
-        """Index of the record with the highest main metric."""
         if not self.records:
             raise ValueError('report has no records')
         return max(
@@ -101,7 +85,6 @@ class ModelReport:
         diagram_paths: Optional[Sequence[str]] = None,
         examples: Optional[Sequence[Tuple[str, int, int]]] = None,
     ) -> str:
-        """Write the workbook to ``path`` and return that path."""
         if not self.records:
             raise ValueError('cannot save an empty report')
         directory = os.path.dirname(path)

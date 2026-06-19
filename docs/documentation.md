@@ -45,6 +45,12 @@ baseline.
   distribution (feature noise). This makes the task overlapping and **not
   perfectly separable**, so the models score high-but-imperfect and the
   improvements are distinguishable - exactly as they would be on real data.
+- **Choosing the corpus**: `python run.py --data real|synthetic|auto` selects the
+  source (`real` = ISOT only, `synthetic` = generated only, `auto` = ISOT if
+  present else synthetic). The real and synthetic runs are treated as two
+  separate experiments: each writes to `reports/model_report_<source>.xlsx` with
+  figures under `reports/figures/<source>/`, and the source is recorded in the
+  report title and in a `data` column on every row.
 
 ![Class distribution](../reports/figures/class_distribution.png)
 ![Article length distribution](../reports/figures/text_lengths.png)

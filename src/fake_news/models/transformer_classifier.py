@@ -1,12 +1,3 @@
-"""DistilBERT fine-tuning - the stretch experiment.
-
-Kept deliberately thin and lazily importing ``transformers`` so the core
-project (and its test-suite) does not depend on the heavy library. On an Apple
-M2 we train on a subset for a single epoch using the MPS backend.
-
-This module is excluded from coverage in ``.coveragerc`` because it requires the
-optional ``transformers``/``datasets`` stack and a multi-minute training run.
-"""
 from typing import Dict, List, Tuple
 
 import torch
@@ -15,7 +6,6 @@ from ..config import TransformerConfig
 
 
 def select_device() -> torch.device:
-    """Prefer Apple MPS, then CUDA, then CPU."""
     if torch.backends.mps.is_available():
         return torch.device('mps')
     if torch.cuda.is_available():
@@ -30,10 +20,6 @@ def fine_tune_distilbert(
     eval_labels: List[int],
     config: TransformerConfig,
 ) -> Tuple[List[int], Dict[str, float]]:
-    """Fine-tune DistilBERT and return ``(predictions, training_summary)``.
-
-    Imports are local so the dependency is only required when this is called.
-    """
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     device = select_device()

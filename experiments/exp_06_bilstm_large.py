@@ -1,4 +1,3 @@
-"""Experiment 06 - improvement 3: a wider and deeper BiLSTM (more capacity)."""
 from _common import LEDGER_PATH, REPORT_PATH, prepare
 
 from src.fake_news.config import LSTMConfig

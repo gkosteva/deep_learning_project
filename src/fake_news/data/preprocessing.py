@@ -1,11 +1,3 @@
-"""Text preprocessing: cleaning, source-leakage removal, tokenisation and vocab.
-
-The ISOT corpus has a well-documented quirk: the real (Reuters) articles almost
-always begin with a dateline such as ``WASHINGTON (Reuters) -``. A model can
-reach near-perfect accuracy just by detecting that token, which does not
-generalise. ``strip_source_leakage`` removes it so the model must learn from the
-actual language.
-"""
 import re
 from collections import Counter
 from typing import Dict, List
@@ -20,15 +12,10 @@ _MULTISPACE = re.compile(r'\s+')
 
 
 def strip_source_leakage(text: str) -> str:
-    """Remove the leading ``... (Reuters) -`` dateline if present."""
     return _REUTERS_DATELINE.sub('', text, count=1)
 
 
 def clean_text(text: str, strip_leakage: bool = True) -> str:
-    """Lowercase, drop URLs/punctuation and collapse whitespace.
-
-    When ``strip_leakage`` is True the Reuters dateline is removed first.
-    """
     if text is None:
         raise ValueError('text must not be None')
     if strip_leakage:
@@ -41,7 +28,6 @@ def clean_text(text: str, strip_leakage: bool = True) -> str:
 
 
 def tokenize(text: str) -> List[str]:
-    """Split cleaned text into whitespace-delimited tokens."""
     cleaned = clean_text(text)
     if not cleaned:
         return []
@@ -49,7 +35,6 @@ def tokenize(text: str) -> List[str]:
 
 
 class Vocabulary:
-    """Maps tokens to integer ids, reserving slots for padding and unknowns."""
 
     def __init__(self, token_to_id: Dict[str, int]):
         if PAD_TOKEN not in token_to_id or UNK_TOKEN not in token_to_id:
@@ -69,11 +54,6 @@ class Vocabulary:
         return self.token_to_id[UNK_TOKEN]
 
     def encode(self, text: str, max_length: int) -> List[int]:
-        """Encode ``text`` into a fixed-length list of token ids.
-
-        Sequences longer than ``max_length`` are truncated; shorter ones are
-        right-padded with the pad id.
-        """
         if max_length <= 0:
             raise ValueError('max_length must be positive')
         ids = [self.token_to_id.get(token, self.unk_id) for token in tokenize(text)]
@@ -88,11 +68,7 @@ class Vocabulary:
         max_size: int = 20000,
         min_frequency: int = 1,
     ) -> 'Vocabulary':
-        """Build a vocabulary from a corpus of raw texts.
-
-        Tokens are ordered by descending frequency; ties are broken
-        alphabetically so the result is deterministic.
-        """
+        
         counter: Counter = Counter()
         for text in texts:
             counter.update(tokenize(text))

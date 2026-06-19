@@ -1,8 +1,3 @@
-"""Training loop for the LSTM models with early stopping and history tracking.
-
-The recorded history feeds the ``train vs validation`` loss and F1 diagrams that
-the Model Report File requires.
-"""
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
@@ -14,7 +9,6 @@ from .metrics import f1_score
 
 
 def select_device() -> torch.device:
-    """Prefer Apple MPS, then CUDA, then CPU."""
     if torch.backends.mps.is_available():
         return torch.device('mps')
     if torch.cuda.is_available():
@@ -24,8 +18,6 @@ def select_device() -> torch.device:
 
 @dataclass
 class TrainingHistory:
-    """Per-epoch metrics gathered during ``Trainer.fit``."""
-
     train_loss: List[float] = field(default_factory=list)
     val_loss: List[float] = field(default_factory=list)
     train_f1: List[float] = field(default_factory=list)
@@ -33,8 +25,6 @@ class TrainingHistory:
 
 
 class Trainer:
-    """Trains an ``nn.Module`` classifier and tracks train/val metrics."""
-
     def __init__(
         self,
         model: nn.Module,
@@ -45,8 +35,6 @@ class Trainer:
     ):
         self.device = device or select_device()
         self.model = model.to(self.device)
-        # AdamW decouples weight decay from the gradient update; with
-        # weight_decay=0.0 it matches plain Adam.
         self.optimizer = torch.optim.AdamW(model.parameters(),
                                            lr=learning_rate,
                                            weight_decay=weight_decay)
@@ -91,7 +79,6 @@ class Trainer:
         epochs: int,
         patience: int = 2,
     ) -> TrainingHistory:
-        """Train for up to ``epochs``, stopping early when val F1 stalls."""
         history = TrainingHistory()
         best_val_f1 = -1.0
         best_state = None
@@ -121,6 +108,5 @@ class Trainer:
         return history
 
     def predict(self, loader: DataLoader) -> Tuple[List[int], List[int]]:
-        """Return ``(references, predictions)`` for every sample in ``loader``."""
         _, references, predictions = self._run_epoch(loader, train=False)
         return references, predictions

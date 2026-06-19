@@ -1,4 +1,3 @@
-"""Experiment 04 - improvement 2: bidirectional LSTM (BiLSTM) with dropout."""
 from _common import LEDGER_PATH, REPORT_PATH, prepare
 
 from src.fake_news.config import LSTMConfig

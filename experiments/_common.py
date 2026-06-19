@@ -1,20 +1,11 @@
-"""Shared setup for the standalone experiment scripts.
-
-Each ``exp_*.py`` script trains one model and appends its row to the shared
-ledger, then rebuilds the Excel report. Run them in order (01 first, it resets
-the ledger so the baseline is always row one).
-
-Importing this module first puts the project root on ``sys.path`` so the scripts
-work whether invoked as ``python experiments/exp_01_baseline.py`` or as a module.
-"""
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.fake_news.config import ExperimentConfig  # noqa: E402
-from src.fake_news.data.dataset import stratified_split  # noqa: E402
-from src.fake_news.main import build_vocabulary, load_dataframe  # noqa: E402
+from src.fake_news.config import ExperimentConfig  
+from src.fake_news.data.dataset import stratified_split  
+from src.fake_news.main import build_vocabulary, load_dataframe  
 
 LEDGER_PATH = 'reports/records.jsonl'
 REPORT_PATH = 'reports/model_report.xlsx'

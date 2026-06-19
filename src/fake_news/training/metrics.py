@@ -1,9 +1,3 @@
-"""Classification metrics: the four usual suspects plus a confusion matrix.
-
-Implemented from first principles (no sklearn dependency at call time) so the
-behaviour is fully specified by the unit tests. ``positive_label`` defaults to
-``0`` (fake) because catching fake news is the costly mistake to track.
-"""
 from typing import Dict, List, Sequence, Tuple
 
 
@@ -19,7 +13,6 @@ def confusion_counts(
     predictions: Sequence[int],
     positive_label: int = 0,
 ) -> Tuple[int, int, int, int]:
-    """Return ``(true_pos, false_pos, true_neg, false_neg)``."""
     _validate(references, predictions)
     true_pos = false_pos = true_neg = false_neg = 0
     for reference, prediction in zip(references, predictions):
@@ -79,7 +72,6 @@ def confusion_matrix(
     predictions: Sequence[int],
     num_classes: int = 2,
 ) -> List[List[int]]:
-    """Row = true class, column = predicted class."""
     _validate(references, predictions)
     matrix = [[0 for _ in range(num_classes)] for _ in range(num_classes)]
     for reference, prediction in zip(references, predictions):
@@ -92,7 +84,6 @@ def evaluate_classification(
     predictions: Sequence[int],
     positive_label: int = 0,
 ) -> Dict[str, float]:
-    """Compute the three reported metrics in one call."""
     return {
         'accuracy': accuracy_score(references, predictions),
         'f1': f1_score(references, predictions, positive_label),

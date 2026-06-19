@@ -1,8 +1,3 @@
-"""Experiment 05 - stretch: fine-tune DistilBERT (requires ``transformers``).
-
-This is optional and heavier than the LSTM experiments. On an Apple M2 it runs
-on the MPS backend over a subset of the data for a single epoch.
-"""
 from _common import LEDGER_PATH, REPORT_PATH, prepare
 
 from src.fake_news.main import POSITIVE_LABEL

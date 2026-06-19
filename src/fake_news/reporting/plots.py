@@ -1,8 +1,3 @@
-"""Matplotlib figures for the report and documentation.
-
-Uses the non-interactive ``Agg`` backend so plots render in headless runs and
-during the test-suite.
-"""
 import os
 from typing import List, Sequence
 
@@ -23,7 +18,6 @@ def _ensure_dir(path: str) -> None:
 def plot_class_distribution(labels: Sequence[int],
                             path: str,
                             class_names: Sequence[str] = ('fake', 'real')) -> str:
-    """Bar chart of how many samples fall in each class."""
     _ensure_dir(path)
     counts = [sum(1 for label in labels if label == index) for index in range(len(class_names))]
     figure, axis = plt.subplots(figsize=(5, 4))
@@ -37,7 +31,6 @@ def plot_class_distribution(labels: Sequence[int],
 
 
 def plot_text_length_histogram(texts: Sequence[str], path: str, bins: int = 30) -> str:
-    """Histogram of token counts per article."""
     _ensure_dir(path)
     lengths = [len(text.split()) for text in texts]
     figure, axis = plt.subplots(figsize=(6, 4))
@@ -52,7 +45,6 @@ def plot_text_length_histogram(texts: Sequence[str], path: str, bins: int = 30) 
 
 
 def plot_training_curves(history: TrainingHistory, metric_path: str, loss_path: str) -> List[str]:
-    """Save the ``train vs validation`` F1 and loss diagrams."""
     _ensure_dir(metric_path)
     _ensure_dir(loss_path)
     epochs = range(1, len(history.train_loss) + 1)
@@ -84,7 +76,6 @@ def plot_training_curves(history: TrainingHistory, metric_path: str, loss_path: 
 def plot_confusion_matrix(matrix: Sequence[Sequence[int]],
                           path: str,
                           class_names: Sequence[str] = ('fake', 'real')) -> str:
-    """Heatmap of a confusion matrix with cell annotations."""
     _ensure_dir(path)
     figure, axis = plt.subplots(figsize=(5, 4))
     image = axis.imshow(matrix, cmap='Blues')

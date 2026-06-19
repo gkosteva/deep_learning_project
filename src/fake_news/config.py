@@ -1,18 +1,12 @@
-"""Configuration dataclasses for data, models and experiments.
-
-Centralising hyperparameters here keeps each experiment script tiny and makes
-the columns of the Model Report File easy to derive programmatically.
-"""
 from dataclasses import asdict, dataclass, field
 from typing import Dict
 
 
 @dataclass
 class DataConfig:
-    """Controls how the raw ISOT corpus is loaded, cleaned and split."""
-
     fake_path: str = 'data/raw/Fake.csv'
     true_path: str = 'data/raw/True.csv'
+    data_source: str = 'auto'
     val_size: float = 0.15
     test_size: float = 0.15
     seed: int = 42
@@ -26,8 +20,6 @@ class DataConfig:
 
 @dataclass
 class LSTMConfig:
-    """Hyperparameters for the LSTM family of models (the main model)."""
-
     embedding_dim: int = 64
     hidden_size: int = 64
     num_layers: int = 1
@@ -40,7 +32,6 @@ class LSTMConfig:
     patience: int = 2
 
     def as_report_columns(self) -> Dict[str, object]:
-        """Return the hyperparameter columns shown in the Model Report File."""
         return {
             'embedding_dim': self.embedding_dim,
             'hidden_size': self.hidden_size,
@@ -56,8 +47,6 @@ class LSTMConfig:
 
 @dataclass
 class TransformerConfig:
-    """Hyperparameters for the DistilBERT fine-tuning stretch experiment."""
-
     model_name: str = 'distilbert-base-uncased'
     learning_rate: float = 5e-5
     batch_size: int = 16
@@ -78,8 +67,6 @@ class TransformerConfig:
 
 @dataclass
 class ExperimentConfig:
-    """Bundles every config used by a single run plus output locations."""
-
     data: DataConfig = field(default_factory=DataConfig)
     lstm: LSTMConfig = field(default_factory=LSTMConfig)
     transformer: TransformerConfig = field(default_factory=TransformerConfig)

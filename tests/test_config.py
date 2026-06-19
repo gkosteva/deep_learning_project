@@ -1,6 +1,12 @@
 import unittest
 
-from src.fake_news.config import (ExperimentConfig, LSTMConfig, TransformerConfig)
+from src.fake_news.config import (DataConfig, ExperimentConfig, LSTMConfig, TransformerConfig)
+
+
+class TestDataConfig(unittest.TestCase):
+
+    def test_when_created_then_data_source_defaults_to_auto(self):
+        self.assertEqual(DataConfig().data_source, 'auto')
 
 
 class TestLSTMConfig(unittest.TestCase):

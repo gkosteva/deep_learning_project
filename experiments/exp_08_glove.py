@@ -1,8 +1,3 @@
-"""Experiment 08 - improvement 5: BiLSTM with GloVe-initialised embeddings.
-
-Place ``glove.6B.100d.txt`` under ``data/raw/`` to use the real vectors; without
-it the loader synthesizes deterministic vectors so the experiment still runs.
-"""
 import torch
 
 from _common import LEDGER_PATH, REPORT_PATH, prepare

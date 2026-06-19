@@ -1,4 +1,3 @@
-"""Experiment 03 - improvement 1: add dropout regularisation."""
 from _common import LEDGER_PATH, REPORT_PATH, prepare
 
 from src.fake_news.config import LSTMConfig

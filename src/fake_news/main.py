@@ -29,13 +29,41 @@ POSITIVE_LABEL = 0  # 'fake' is the class we care about catching
 
 
 def load_dataframe(config: ExperimentConfig):
-    """Load the ISOT corpus, or a synthetic stand-in when it is missing."""
+    """Load the corpus according to ``config.data.data_source``.
+
+    * ``'real'``      -> ISOT only (raises if the CSVs are missing).
+    * ``'synthetic'`` -> always the generated corpus.
+    * ``'auto'``      -> ISOT if present, otherwise synthetic.
+
+    Returns ``(dataframe, source_label)`` where the label is ``'ISOT'`` or
+    ``'synthetic'``.
+    """
+    data_source = config.data.data_source
+    if data_source not in ('auto', 'real', 'synthetic'):
+        raise ValueError("data_source must be 'auto', 'real' or 'synthetic', "
+                         f'got {data_source!r}')
+
+    if data_source == 'synthetic':
+        return generate_synthetic_dataset(seed=config.data.seed), 'synthetic'
+    if data_source == 'real':
+        return load_isot(config.data.fake_path, config.data.true_path), 'ISOT'
     try:
-        frame = load_isot(config.data.fake_path, config.data.true_path)
-        return frame, 'ISOT'
+        return load_isot(config.data.fake_path, config.data.true_path), 'ISOT'
     except FileNotFoundError:
-        frame = generate_synthetic_dataset(seed=config.data.seed)
-        return frame, 'synthetic'
+        return generate_synthetic_dataset(seed=config.data.seed), 'synthetic'
+
+
+def resolve_output_paths(config: ExperimentConfig, source_label: str) -> Tuple[str, str]:
+    """Return ``(report_path, figures_dir)`` namespaced by the data source.
+
+    This keeps the real-data and synthetic-data runs in separate files so one
+    never overwrites the other.
+    """
+    label = source_label.lower()
+    base, extension = os.path.splitext(config.report_path)
+    report_path = f'{base}_{label}{extension}'
+    figures_dir = os.path.join(config.figures_dir, label)
+    return report_path, figures_dir
 
 
 def build_vocabulary(train_texts: List[str], config: ExperimentConfig) -> Vocabulary:
@@ -130,7 +158,8 @@ def run(config: Optional[ExperimentConfig] = None) -> int:
     )
     vocabulary = build_vocabulary(splits[0][0], config)
 
-    report = ModelReport(main_metric='f1')
+    report = ModelReport(title=f'Model Report - Fake News Detection ({source} data)',
+                         main_metric='f1')
 
     baseline = MajorityClassClassifier().fit(splits[0][1])
     baseline_predictions = baseline.predict(splits[2][0])
@@ -138,7 +167,10 @@ def run(config: Optional[ExperimentConfig] = None) -> int:
     report.add(
         ExperimentRecord(
             name='Baseline (majority class)',
-            hyperparameters={'strategy': 'most_frequent'},
+            hyperparameters={
+                'data': source,
+                'strategy': 'most_frequent'
+            },
             metrics=baseline_metrics,
             comment=('Greediest statistical model: always predicts the majority class. '
                      'Reference point for every other model.'),
@@ -171,17 +203,18 @@ def run(config: Optional[ExperimentConfig] = None) -> int:
     ]
     results.append(_run_glove_experiment(config, splits, vocabulary))
     for record, _, _, _ in results:
+        record.hyperparameters['data'] = source
         report.add(record)
 
     best_index = max(range(len(results)), key=lambda i: results[i][0].metrics['f1'])
     _, best_history, best_refs, best_preds = results[best_index]
 
-    diagram_paths = _generate_figures(config, splits, best_history, best_refs, best_preds)
+    report_path, figures_dir = resolve_output_paths(config, source)
+    figure_config = replace(config, figures_dir=figures_dir)
+    diagram_paths = _generate_figures(figure_config, splits, best_history, best_refs, best_preds)
     examples = _collect_examples(splits[2][0], best_refs, best_preds)
-    report_path = report.save(config.report_path,
-                              diagram_paths=diagram_paths[-2:],
-                              examples=examples)
-    print(f'Report written to {report_path}.')
+    saved_path = report.save(report_path, diagram_paths=diagram_paths[-2:], examples=examples)
+    print(f'Report written to {saved_path}.')
     return 0
 
 

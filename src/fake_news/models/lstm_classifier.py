@@ -1,10 +1,3 @@
-"""LSTM-based text classifier - the project's main model.
-
-The same class covers the chosen improvements: ``dropout`` adds regularisation,
-``bidirectional=True`` turns it into a BiLSTM, and ``pretrained_embeddings``
-initialises the embedding layer from GloVe vectors. This keeps the modelling
-story in a single, well-tested component.
-"""
 from typing import Optional
 
 import torch
@@ -12,7 +5,6 @@ import torch.nn as nn
 
 
 class LSTMClassifier(nn.Module):
-    """Embedding -> (Bi)LSTM -> dropout -> linear classifier head."""
 
     def __init__(
         self,
@@ -61,12 +53,6 @@ class LSTMClassifier(nn.Module):
         self.embedding.weight.requires_grad = not freeze
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
-        """Map a batch of ``(batch, seq_len)`` token ids to class logits.
-
-        Articles are right-padded, so we mean-pool the LSTM outputs over the
-        real (non-pad) positions instead of reading a single, likely-padded
-        time step. This lets the model learn from short documents.
-        """
         embedded = self.embedding(token_ids)
         outputs, _ = self.lstm(embedded)
         mask = (token_ids != self.pad_id).unsqueeze(-1).to(outputs.dtype)
@@ -76,5 +62,4 @@ class LSTMClassifier(nn.Module):
         return self.classifier(pooled)
 
     def count_parameters(self) -> int:
-        """Total number of trainable parameters (the ``numel`` trick)."""
         return sum(parameter.numel() for parameter in self.parameters() if parameter.requires_grad)
