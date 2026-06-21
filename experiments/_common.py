@@ -3,16 +3,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.fake_news.config import ExperimentConfig  
-from src.fake_news.data.dataset import stratified_split  
-from src.fake_news.main import build_vocabulary, load_dataframe  
+from src.fake_news.config import ExperimentConfig
+from src.fake_news.data.dataset import stratified_split
+from src.fake_news.main import build_vocabulary, load_dataframe
 
 LEDGER_PATH = 'reports/records.jsonl'
 REPORT_PATH = 'reports/model_report.xlsx'
 
 
 def prepare(config: ExperimentConfig = None):
-    """Load data, split it and build the vocabulary used by every experiment."""
     config = config or ExperimentConfig()
     frame, source = load_dataframe(config)
     print(f'Loaded {len(frame)} articles from the {source} source.')

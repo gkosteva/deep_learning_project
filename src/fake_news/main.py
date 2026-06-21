@@ -1,10 +1,3 @@
-"""End-to-end pipeline: data -> baseline -> LSTM -> improvements -> report.
-
-Running ``python run.py`` executes every experiment and writes the Model Report
-File plus all figures. If the ISOT CSVs are not present under ``data/raw`` the
-pipeline transparently falls back to a small synthetic corpus so the project is
-runnable out of the box.
-"""
 import os
 from dataclasses import replace
 from typing import List, Optional, Tuple
@@ -25,19 +18,10 @@ from .reporting.report_card import ExperimentRecord, ModelReport
 from .training.metrics import confusion_matrix, evaluate_classification
 from .training.trainer import Trainer, TrainingHistory
 
-POSITIVE_LABEL = 0  # 'fake' is the class we care about catching
+POSITIVE_LABEL = 0
 
 
 def load_dataframe(config: ExperimentConfig):
-    """Load the corpus according to ``config.data.data_source``.
-
-    * ``'real'``      -> ISOT only (raises if the CSVs are missing).
-    * ``'synthetic'`` -> always the generated corpus.
-    * ``'auto'``      -> ISOT if present, otherwise synthetic.
-
-    Returns ``(dataframe, source_label)`` where the label is ``'ISOT'`` or
-    ``'synthetic'``.
-    """
     data_source = config.data.data_source
     if data_source not in ('auto', 'real', 'synthetic'):
         raise ValueError("data_source must be 'auto', 'real' or 'synthetic', "
@@ -54,11 +38,6 @@ def load_dataframe(config: ExperimentConfig):
 
 
 def resolve_output_paths(config: ExperimentConfig, source_label: str) -> Tuple[str, str]:
-    """Return ``(report_path, figures_dir)`` namespaced by the data source.
-
-    This keeps the real-data and synthetic-data runs in separate files so one
-    never overwrites the other.
-    """
     label = source_label.lower()
     base, extension = os.path.splitext(config.report_path)
     report_path = f'{base}_{label}{extension}'
@@ -91,7 +70,6 @@ def run_lstm_experiment(
     pretrained_embeddings: Optional[torch.Tensor] = None,
     freeze_embeddings: bool = False,
 ) -> Tuple[ExperimentRecord, TrainingHistory, List[int], List[int]]:
-    """Train one LSTM variant and return its report record plus diagnostics."""
     torch.manual_seed(config.data.seed)
     (train_texts, train_labels), (val_texts, val_labels), (test_texts, test_labels) = splits
 
@@ -144,7 +122,6 @@ def run_lstm_experiment(
 
 
 def run(config: Optional[ExperimentConfig] = None) -> int:
-    """Execute the full experiment suite and write the report. Returns 0."""
     config = config or ExperimentConfig()
     frame, source = load_dataframe(config)
     print(f'Loaded {len(frame)} articles from the {source} source.')
@@ -219,7 +196,6 @@ def run(config: Optional[ExperimentConfig] = None) -> int:
 
 
 def _run_glove_experiment(config: ExperimentConfig, splits, vocabulary: Vocabulary):
-    """Build a GloVe-initialised BiLSTM experiment (improvement 5)."""
     vectors, source = load_or_synthesize_glove(config.data.glove_path, vocabulary,
                                                config.data.glove_dim, config.data.seed)
     matrix = build_embedding_matrix(vocabulary, vectors, config.data.glove_dim, config.data.seed)
@@ -262,7 +238,6 @@ def _generate_figures(config, splits, history, references, predictions) -> List[
 
 
 def _collect_examples(texts, references, predictions, limit: int = 6):
-    """Pick a few correct and incorrect predictions for the best-model sheet."""
     correct = [(texts[i], references[i], predictions[i])
                for i in range(len(references))
                if references[i] == predictions[i]]
