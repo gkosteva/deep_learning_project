@@ -2,99 +2,116 @@ import os
 import tempfile
 import unittest
 
-import pandas as pd
-
-from src.fake_news.data.dataset import (FakeNewsDataset, generate_synthetic_dataset, load_isot,
-                                        stratified_split)
+from src.fake_news.data.dataset import LiarDataset, generate_synthetic_liar, label_column, \
+    load_liar, load_liar_split, select_text
 from src.fake_news.data.preprocessing import Vocabulary
 
+_ROW = '\t'.join([
+    '1.json', 'false', 'A false claim about taxes.', 'taxes', 'jane-doe', 'Senator', 'Texas',
+    'republican', '1', '2', '3', '4', '5', 'a speech'
+])
+_ROW_TRUE = '\t'.join([
+    '2.json', 'true', 'A true claim about jobs.', 'jobs', 'john-roe', 'Governor', 'Ohio',
+    'democrat', '0', '0', '1', '1', '0', 'an interview'
+])
 
-class TestLoadIsot(unittest.TestCase):
+
+def _write_split(directory, name, rows):
+    path = os.path.join(directory, name)
+    with open(path, 'w', encoding='utf-8') as handle:
+        handle.write('\n'.join(rows) + '\n')
+    return path
+
+
+class TestLoadLiarSplit(unittest.TestCase):
+
+    def test_when_missing_then_file_not_found_is_raised(self):
+        with self.assertRaises(FileNotFoundError):
+            load_liar_split('/tmp/nope-liar.tsv')
+
+    def test_when_loaded_then_labels_are_mapped(self):
+        directory = tempfile.mkdtemp()
+        path = _write_split(directory, 'train.tsv', [_ROW, _ROW_TRUE])
+        frame = load_liar_split(path)
+        self.assertEqual(frame['label_six'].tolist(), [1, 5])
+        self.assertEqual(frame['label_binary'].tolist(), [0, 1])
+
+    def test_when_loaded_then_meta_text_combines_fields(self):
+        directory = tempfile.mkdtemp()
+        path = _write_split(directory, 'train.tsv', [_ROW])
+        frame = load_liar_split(path)
+        self.assertIn('jane-doe', frame['meta_text'][0])
+        self.assertIn('republican', frame['meta_text'][0])
+
+
+class TestLoadLiar(unittest.TestCase):
+
+    def test_when_directory_has_all_splits_then_three_frames_returned(self):
+        directory = tempfile.mkdtemp()
+        _write_split(directory, 'train.tsv', [_ROW, _ROW_TRUE])
+        _write_split(directory, 'valid.tsv', [_ROW])
+        _write_split(directory, 'test.tsv', [_ROW_TRUE])
+        train, val, test = load_liar(directory)
+        self.assertEqual((len(train), len(val), len(test)), (2, 1, 1))
+
+
+class TestGenerateSyntheticLiar(unittest.TestCase):
+
+    def test_when_called_then_every_label_is_present(self):
+        frame = generate_synthetic_liar(n_per_class=5, seed=1)
+        self.assertEqual(len(frame), 30)
+        self.assertEqual(frame['label_six'].nunique(), 6)
+
+    def test_when_called_then_binary_labels_only_zero_and_one(self):
+        frame = generate_synthetic_liar(n_per_class=4, seed=1)
+        self.assertEqual(set(frame['label_binary'].unique()), {0, 1})
+
+
+class TestLabelColumn(unittest.TestCase):
+
+    def test_when_task_six_then_returns_six_column(self):
+        self.assertEqual(label_column('six'), 'label_six')
+
+    def test_when_task_binary_then_returns_binary_column(self):
+        self.assertEqual(label_column('binary'), 'label_binary')
+
+    def test_when_task_invalid_then_value_error_is_raised(self):
+        with self.assertRaises(ValueError):
+            label_column('nonsense')
+
+
+class TestSelectText(unittest.TestCase):
 
     def setUp(self):
-        self.directory = tempfile.mkdtemp()
-        self.fake_path = os.path.join(self.directory, 'Fake.csv')
-        self.true_path = os.path.join(self.directory, 'True.csv')
-        pd.DataFrame({'title': ['a', 'b'], 'text': ['x', 'y']}).to_csv(self.fake_path, index=False)
-        pd.DataFrame({'title': ['c'], 'text': ['z']}).to_csv(self.true_path, index=False)
+        self.frame = generate_synthetic_liar(n_per_class=2, seed=1)
 
-    def test_when_files_exist_then_labels_are_assigned(self):
-        frame = load_isot(self.fake_path, self.true_path)
-        self.assertEqual(len(frame), 3)
-        self.assertEqual(frame['label'].tolist(), [0, 0, 1])
+    def test_when_metadata_false_then_returns_statement(self):
+        texts = select_text(self.frame, use_metadata=False)
+        self.assertEqual(texts[0], self.frame['statement'][0])
 
-    def test_when_fake_file_missing_then_file_not_found_is_raised(self):
-        with self.assertRaises(FileNotFoundError):
-            load_isot(os.path.join(self.directory, 'nope.csv'), self.true_path)
-
-    def test_when_true_file_missing_then_file_not_found_is_raised(self):
-        with self.assertRaises(FileNotFoundError):
-            load_isot(self.fake_path, os.path.join(self.directory, 'nope.csv'))
+    def test_when_metadata_true_then_text_is_longer(self):
+        plain = select_text(self.frame, use_metadata=False)[0]
+        with_meta = select_text(self.frame, use_metadata=True)[0]
+        self.assertGreaterEqual(len(with_meta), len(plain))
 
 
-class TestGenerateSyntheticDataset(unittest.TestCase):
-
-    def test_when_called_then_classes_are_balanced(self):
-        frame = generate_synthetic_dataset(n_per_class=10, seed=1)
-        self.assertEqual(len(frame), 20)
-        self.assertEqual((frame['label'] == 0).sum(), 10)
-        self.assertEqual((frame['label'] == 1).sum(), 10)
-
-    def test_when_noise_is_zero_then_labels_stay_balanced(self):
-        frame = generate_synthetic_dataset(n_per_class=8, seed=1, noise=0.0)
-        self.assertEqual((frame['label'] == 0).sum(), 8)
-        self.assertEqual((frame['label'] == 1).sum(), 8)
-
-    def test_when_noise_is_one_then_labels_stay_balanced(self):
-        frame = generate_synthetic_dataset(n_per_class=8, seed=1, noise=1.0)
-        self.assertEqual((frame['label'] == 0).sum(), 8)
-        self.assertEqual((frame['label'] == 1).sum(), 8)
-
-    def test_when_called_then_tokens_are_alphabetic(self):
-        frame = generate_synthetic_dataset(n_per_class=5, seed=1)
-        tokens = ' '.join(frame['text'].tolist()).split()
-        self.assertTrue(all(token.isalpha() for token in tokens))
-
-
-class TestStratifiedSplit(unittest.TestCase):
-
-    def setUp(self):
-        self.frame = generate_synthetic_dataset(n_per_class=50, seed=2)
-
-    def test_when_called_then_splits_cover_all_samples(self):
-        train, val, test = stratified_split(self.frame, 0.2, 0.2, seed=0)
-        self.assertEqual(len(train) + len(val) + len(test), len(self.frame))
-
-    def test_when_test_size_invalid_then_value_error_is_raised(self):
-        with self.assertRaises(ValueError):
-            stratified_split(self.frame, 0.2, 1.5, seed=0)
-
-    def test_when_val_size_invalid_then_value_error_is_raised(self):
-        with self.assertRaises(ValueError):
-            stratified_split(self.frame, 0.0, 0.2, seed=0)
-
-    def test_when_sizes_sum_too_large_then_value_error_is_raised(self):
-        with self.assertRaises(ValueError):
-            stratified_split(self.frame, 0.6, 0.6, seed=0)
-
-
-class TestFakeNewsDataset(unittest.TestCase):
+class TestLiarDataset(unittest.TestCase):
 
     def setUp(self):
         self.vocabulary = Vocabulary.build(['cat dog bird'], min_frequency=1)
 
     def test_when_lengths_mismatch_then_value_error_is_raised(self):
         with self.assertRaises(ValueError):
-            FakeNewsDataset(['a', 'b'], [0], self.vocabulary, 5)
+            LiarDataset(['a', 'b'], [0], self.vocabulary, 5)
 
     def test_when_indexed_then_returns_feature_and_label_tensors(self):
-        dataset = FakeNewsDataset(['cat dog'], [1], self.vocabulary, 5)
+        dataset = LiarDataset(['cat dog'], [3], self.vocabulary, 5)
         features, label = dataset[0]
         self.assertEqual(tuple(features.shape), (5, ))
-        self.assertEqual(label.item(), 1)
+        self.assertEqual(label.item(), 3)
 
     def test_when_len_called_then_returns_number_of_samples(self):
-        dataset = FakeNewsDataset(['cat', 'dog'], [0, 1], self.vocabulary, 3)
+        dataset = LiarDataset(['cat', 'dog'], [0, 1], self.vocabulary, 3)
         self.assertEqual(len(dataset), 2)
 
 

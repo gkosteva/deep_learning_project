@@ -7,8 +7,13 @@ from openpyxl.drawing.image import Image as XlsxImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-METRIC_KEYS = ('accuracy', 'f1', 'recall')
-METRIC_TITLES = {'accuracy': 'Accuracy', 'f1': 'F1', 'recall': 'Recall'}
+METRIC_KEYS = ('accuracy', 'macro_precision', 'macro_recall', 'macro_f1')
+METRIC_TITLES = {
+    'accuracy': 'Accuracy',
+    'macro_precision': 'Macro Precision',
+    'macro_recall': 'Macro Recall',
+    'macro_f1': 'Macro F1',
+}
 
 _HEADER_FILL = PatternFill('solid', fgColor='1F4E78')
 _HEADER_FONT = Font(color='FFFFFF', bold=True)
@@ -31,7 +36,9 @@ class ExperimentRecord:
 
 class ModelReport:
 
-    def __init__(self, title: str = 'Model Report - Fake News Detection', main_metric: str = 'f1'):
+    def __init__(self,
+                 title: str = 'Model Report - LIAR Fake News Detection',
+                 main_metric: str = 'macro_f1'):
         if main_metric not in METRIC_KEYS:
             raise ValueError(f'main_metric must be one of {METRIC_KEYS}')
         self.title = title
@@ -136,7 +143,7 @@ class ModelReport:
             row = header_row + 1 + offset
             is_baseline = offset == 0
             is_best = offset == best_index
-            values = [record.name]
+            values: List[object] = [record.name]
             values += [record.hyperparameters.get(col, '') for col in hyper_columns]
             metric_start = 1 + len(hyper_columns) + 1
             values += [self._format_metric(record, m, is_baseline) for m in METRIC_KEYS]

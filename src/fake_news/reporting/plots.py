@@ -15,15 +15,15 @@ def _ensure_dir(path: str) -> None:
         os.makedirs(directory, exist_ok=True)
 
 
-def plot_class_distribution(labels: Sequence[int],
-                            path: str,
-                            class_names: Sequence[str] = ('fake', 'real')) -> str:
+def plot_class_distribution(labels: Sequence[int], path: str, class_names: Sequence[str]) -> str:
     _ensure_dir(path)
     counts = [sum(1 for label in labels if label == index) for index in range(len(class_names))]
-    figure, axis = plt.subplots(figsize=(5, 4))
-    axis.bar(class_names, counts, color=['#C00000', '#1F4E78'])
-    axis.set_title('Class distribution')
-    axis.set_ylabel('Number of articles')
+    colors = plt.cm.viridis([i / max(1, len(class_names) - 1) for i in range(len(class_names))])
+    figure, axis = plt.subplots(figsize=(7, 4))
+    axis.bar(class_names, counts, color=colors)
+    axis.set_title('Label distribution')
+    axis.set_ylabel('Number of statements')
+    axis.tick_params(axis='x', rotation=30)
     figure.tight_layout()
     figure.savefig(path)
     plt.close(figure)
@@ -35,8 +35,8 @@ def plot_text_length_histogram(texts: Sequence[str], path: str, bins: int = 30) 
     lengths = [len(text.split()) for text in texts]
     figure, axis = plt.subplots(figsize=(6, 4))
     axis.hist(lengths, bins=bins, color='#1F4E78')
-    axis.set_title('Article length distribution')
-    axis.set_xlabel('Tokens per article')
+    axis.set_title('Statement length distribution')
+    axis.set_xlabel('Words per statement')
     axis.set_ylabel('Frequency')
     figure.tight_layout()
     figure.savefig(path)
@@ -50,11 +50,11 @@ def plot_training_curves(history: TrainingHistory, metric_path: str, loss_path: 
     epochs = range(1, len(history.train_loss) + 1)
 
     figure, axis = plt.subplots(figsize=(6, 4))
-    axis.plot(epochs, history.train_f1, marker='o', label='train F1')
-    axis.plot(epochs, history.val_f1, marker='o', label='validation F1')
-    axis.set_title('Train vs validation F1')
+    axis.plot(epochs, history.train_f1, marker='o', label='train macro-F1')
+    axis.plot(epochs, history.val_f1, marker='o', label='validation macro-F1')
+    axis.set_title('Train vs validation macro-F1')
     axis.set_xlabel('Epoch')
-    axis.set_ylabel('F1')
+    axis.set_ylabel('Macro-F1')
     axis.legend()
     figure.tight_layout()
     figure.savefig(metric_path)
@@ -73,20 +73,22 @@ def plot_training_curves(history: TrainingHistory, metric_path: str, loss_path: 
     return [metric_path, loss_path]
 
 
-def plot_confusion_matrix(matrix: Sequence[Sequence[int]],
-                          path: str,
-                          class_names: Sequence[str] = ('fake', 'real')) -> str:
+def plot_confusion_matrix(matrix: Sequence[Sequence[int]], path: str,
+                          class_names: Sequence[str]) -> str:
     _ensure_dir(path)
-    figure, axis = plt.subplots(figsize=(5, 4))
+    figure, axis = plt.subplots(figsize=(6, 5))
     image = axis.imshow(matrix, cmap='Blues')
     axis.set_xticks(range(len(class_names)), labels=class_names)
     axis.set_yticks(range(len(class_names)), labels=class_names)
+    axis.tick_params(axis='x', rotation=45)
     axis.set_xlabel('Predicted')
     axis.set_ylabel('True')
     axis.set_title('Confusion matrix (best model)')
+    threshold = max((max(row) for row in matrix), default=0) / 2
     for i, row in enumerate(matrix):
         for j, value in enumerate(row):
-            axis.text(j, i, str(value), ha='center', va='center', color='black')
+            color = 'white' if value > threshold else 'black'
+            axis.text(j, i, str(value), ha='center', va='center', color=color)
     figure.colorbar(image, ax=axis)
     figure.tight_layout()
     figure.savefig(path)

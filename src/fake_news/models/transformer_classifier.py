@@ -13,19 +13,28 @@ def select_device() -> torch.device:
     return torch.device('cpu')
 
 
-def fine_tune_distilbert(
+def fine_tune_transformer(
     train_texts: List[str],
     train_labels: List[int],
     eval_texts: List[str],
     eval_labels: List[int],
     config: TransformerConfig,
+    num_classes: int,
 ) -> Tuple[List[int], Dict[str, float]]:
+    """Fine-tune any HuggingFace sequence-classification model (BERT, RoBERTa,
+    DistilBERT, GPT-2, ...) for `num_classes` labels and return test predictions."""
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     device = select_device()
     tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+    if tokenizer.pad_token is None:
+        # Decoder-only models such as GPT-2 ship without a padding token.
+        tokenizer.pad_token = tokenizer.eos_token
+
     model = AutoModelForSequenceClassification.from_pretrained(config.model_name,
-                                                               num_labels=2).to(device)
+                                                               num_labels=num_classes)
+    model.config.pad_token_id = tokenizer.pad_token_id
+    model = model.to(device)
 
     def encode(texts: List[str]) -> Dict[str, torch.Tensor]:
         return tokenizer(

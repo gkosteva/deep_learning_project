@@ -2,15 +2,16 @@ import os
 import tempfile
 import unittest
 
-from src.fake_news.reporting.ledger import (append_record, load_records, rebuild_report)
+from src.fake_news.reporting.ledger import append_record, load_records, rebuild_report
 from src.fake_news.reporting.report_card import ExperimentRecord
 
 
 def _record(name='Baseline'):
     return ExperimentRecord(name, {'strategy': 'most_frequent'}, {
         'accuracy': 0.5,
-        'f1': 0.4,
-        'recall': 0.5
+        'macro_f1': 0.4,
+        'macro_precision': 0.4,
+        'macro_recall': 0.5
     }, 'note')
 
 

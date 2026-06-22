@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from .metrics import f1_score
+from .metrics import macro_f1_score
 
 
 def select_device() -> torch.device:
@@ -25,12 +25,13 @@ class TrainingHistory:
 
 
 class Trainer:
+
     def __init__(
         self,
         model: nn.Module,
         learning_rate: float = 1e-3,
         device: Optional[torch.device] = None,
-        positive_label: int = 0,
+        num_classes: int = 2,
         weight_decay: float = 0.0,
     ):
         self.device = device or select_device()
@@ -39,7 +40,7 @@ class Trainer:
                                            lr=learning_rate,
                                            weight_decay=weight_decay)
         self.criterion = nn.CrossEntropyLoss()
-        self.positive_label = positive_label
+        self.num_classes = num_classes
 
     def _run_epoch(
         self,
@@ -90,8 +91,8 @@ class Trainer:
 
             history.train_loss.append(train_loss)
             history.val_loss.append(val_loss)
-            history.train_f1.append(f1_score(train_refs, train_preds, self.positive_label))
-            current_val_f1 = f1_score(val_refs, val_preds, self.positive_label)
+            history.train_f1.append(macro_f1_score(train_refs, train_preds, self.num_classes))
+            current_val_f1 = macro_f1_score(val_refs, val_preds, self.num_classes)
             history.val_f1.append(current_val_f1)
 
             if current_val_f1 > best_val_f1:

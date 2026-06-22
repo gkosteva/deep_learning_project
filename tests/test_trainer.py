@@ -4,13 +4,16 @@ from unittest import mock
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from src.fake_news.models.lstm_classifier import LSTMClassifier
-from src.fake_news.training.trainer import (Trainer, TrainingHistory, select_device)
+from src.fake_news.models.rnn_classifier import RNNClassifier
+from src.fake_news.training.trainer import Trainer, TrainingHistory, select_device
 
 
-def _make_loader(num_samples: int = 16, seq_len: int = 5, vocab_size: int = 20):
+def _make_loader(num_samples: int = 16,
+                 seq_len: int = 5,
+                 vocab_size: int = 20,
+                 num_classes: int = 3):
     features = torch.randint(0, vocab_size, (num_samples, seq_len))
-    labels = torch.randint(0, 2, (num_samples, ))
+    labels = torch.randint(0, num_classes, (num_samples, ))
     return DataLoader(TensorDataset(features, labels), batch_size=8)
 
 
@@ -38,8 +41,11 @@ class TestTrainerFit(unittest.TestCase):
 
     def setUp(self):
         torch.manual_seed(0)
-        self.model = LSTMClassifier(vocab_size=20, embedding_dim=8, hidden_size=8)
-        self.trainer = Trainer(self.model, learning_rate=1e-2, device=torch.device('cpu'))
+        self.model = RNNClassifier(vocab_size=20, embedding_dim=8, hidden_size=8, num_classes=3)
+        self.trainer = Trainer(self.model,
+                               learning_rate=1e-2,
+                               device=torch.device('cpu'),
+                               num_classes=3)
 
     def test_when_fit_then_history_has_one_entry_per_epoch(self):
         history = self.trainer.fit(_make_loader(), _make_loader(), epochs=2, patience=5)
@@ -53,8 +59,12 @@ class TestTrainerFit(unittest.TestCase):
 
     def test_when_weight_decay_set_then_training_still_runs(self):
         torch.manual_seed(0)
-        model = LSTMClassifier(vocab_size=20, embedding_dim=8, hidden_size=8)
-        trainer = Trainer(model, learning_rate=1e-2, device=torch.device('cpu'), weight_decay=0.01)
+        model = RNNClassifier(vocab_size=20, embedding_dim=8, hidden_size=8, num_classes=3)
+        trainer = Trainer(model,
+                          learning_rate=1e-2,
+                          device=torch.device('cpu'),
+                          num_classes=3,
+                          weight_decay=0.01)
         history = trainer.fit(_make_loader(), _make_loader(), epochs=1, patience=1)
         self.assertEqual(len(history.train_loss), 1)
 
@@ -63,8 +73,8 @@ class TestTrainerPredict(unittest.TestCase):
 
     def test_when_predict_then_returns_aligned_references_and_predictions(self):
         torch.manual_seed(0)
-        model = LSTMClassifier(vocab_size=20, embedding_dim=8, hidden_size=8)
-        trainer = Trainer(model, device=torch.device('cpu'))
+        model = RNNClassifier(vocab_size=20, embedding_dim=8, hidden_size=8, num_classes=3)
+        trainer = Trainer(model, device=torch.device('cpu'), num_classes=3)
         loader = _make_loader(num_samples=8)
         references, predictions = trainer.predict(loader)
         self.assertEqual(len(references), len(predictions))

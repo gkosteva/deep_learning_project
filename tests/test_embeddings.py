@@ -4,8 +4,8 @@ import unittest
 
 import numpy as np
 
-from src.fake_news.data.embeddings import (build_embedding_matrix, load_glove_vectors,
-                                           load_or_synthesize_glove, synthesize_glove_vectors)
+from src.fake_news.data.embeddings import build_embedding_matrix, load_vectors_file, \
+    resolve_embeddings, synthesize_vectors, train_word2vec
 from src.fake_news.data.preprocessing import Vocabulary
 
 
@@ -13,53 +13,84 @@ def _vocabulary():
     return Vocabulary.build(['cat dog bird'], min_frequency=1)
 
 
-def _write_glove(directory, lines):
-    path = os.path.join(directory, 'glove.txt')
+def _write_vectors(directory, lines):
+    path = os.path.join(directory, 'vectors.txt')
     with open(path, 'w', encoding='utf-8') as handle:
         handle.write('\n'.join(lines) + '\n')
     return path
 
 
-class TestLoadGloveVectors(unittest.TestCase):
+class TestLoadVectorsFile(unittest.TestCase):
 
     def test_when_file_missing_then_file_not_found_is_raised(self):
         with self.assertRaises(FileNotFoundError):
-            load_glove_vectors('/tmp/no-such-glove.txt')
+            load_vectors_file('/tmp/no-such-vectors.txt')
 
-    def test_when_file_valid_then_vectors_are_parsed(self):
+    def test_when_glove_format_then_vectors_are_parsed(self):
         directory = tempfile.mkdtemp()
-        path = _write_glove(directory, ['cat 0.1 0.2', 'dog 0.3 0.4'])
-        vectors = load_glove_vectors(path)
+        path = _write_vectors(directory, ['cat 0.1 0.2', 'dog 0.3 0.4'])
+        vectors = load_vectors_file(path)
         self.assertEqual(set(vectors.keys()), {'cat', 'dog'})
         self.assertEqual(vectors['cat'].shape, (2, ))
 
-    def test_when_line_has_no_vector_then_it_is_skipped(self):
+    def test_when_word2vec_header_then_it_is_skipped(self):
         directory = tempfile.mkdtemp()
-        path = _write_glove(directory, ['cat 0.1 0.2', 'lonely'])
-        vectors = load_glove_vectors(path)
+        path = _write_vectors(directory, ['2 2', 'cat 0.1 0.2', 'dog 0.3 0.4'])
+        vectors = load_vectors_file(path)
+        self.assertEqual(set(vectors.keys()), {'cat', 'dog'})
+
+    def test_when_line_too_short_then_it_is_skipped(self):
+        directory = tempfile.mkdtemp()
+        path = _write_vectors(directory, ['cat 0.1 0.2', 'dog 0.3 0.4', 'lonely'])
+        vectors = load_vectors_file(path)
         self.assertNotIn('lonely', vectors)
 
 
-class TestSynthesizeGloveVectors(unittest.TestCase):
+class TestSynthesizeVectors(unittest.TestCase):
 
     def test_when_called_then_special_tokens_are_excluded(self):
-        vectors = synthesize_glove_vectors(_vocabulary(), dim=5)
+        vectors = synthesize_vectors(_vocabulary(), dim=5)
         self.assertNotIn('<pad>', vectors)
         self.assertNotIn('<unk>', vectors)
         self.assertEqual(vectors['cat'].shape, (5, ))
 
 
-class TestLoadOrSynthesizeGlove(unittest.TestCase):
+class TestResolveEmbeddings(unittest.TestCase):
 
-    def test_when_file_exists_then_source_is_file(self):
+    def test_when_glove_file_present_then_source_is_file(self):
         directory = tempfile.mkdtemp()
-        path = _write_glove(directory, ['cat 0.1 0.2'])
-        _, source = load_or_synthesize_glove(path, _vocabulary(), dim=2)
-        self.assertEqual(source, 'file')
+        path = _write_vectors(directory, ['cat 0.1 0.2', 'dog 0.3 0.4'])
+        _, source = resolve_embeddings('glove', _vocabulary(), ['cat dog'], dim=2, path=path)
+        self.assertEqual(source, 'glove-file')
 
-    def test_when_file_missing_then_source_is_synthetic(self):
-        _, source = load_or_synthesize_glove('/tmp/missing.txt', _vocabulary(), dim=4)
-        self.assertEqual(source, 'synthetic')
+    def test_when_glove_file_missing_then_source_is_synthetic(self):
+        _, source = resolve_embeddings('glove', _vocabulary(), ['cat dog'], dim=4, path='')
+        self.assertEqual(source, 'glove-synthetic')
+
+    def test_when_word2vec_then_vectors_are_trained(self):
+        vectors, source = resolve_embeddings('word2vec',
+                                             _vocabulary(), ['cat dog bird', 'cat dog'],
+                                             dim=8)
+        self.assertEqual(source, 'word2vec-trained')
+        self.assertIn('cat', vectors)
+
+    def test_when_fasttext_then_vectors_are_trained(self):
+        vectors, source = resolve_embeddings('fasttext',
+                                             _vocabulary(), ['cat dog bird', 'cat dog'],
+                                             dim=8)
+        self.assertEqual(source, 'fasttext-trained')
+        self.assertIn('cat', vectors)
+
+    def test_when_kind_unknown_then_value_error_is_raised(self):
+        with self.assertRaises(ValueError):
+            resolve_embeddings('bogus', _vocabulary(), ['cat'], dim=2)
+
+
+class TestTrainWord2Vec(unittest.TestCase):
+
+    def test_when_trained_then_vectors_have_requested_dim(self):
+        vectors = train_word2vec(['cat dog bird', 'cat dog'], dim=6, epochs=1)
+        self.assertEqual(vectors['cat'].shape, (6, ))
 
 
 class TestBuildEmbeddingMatrix(unittest.TestCase):

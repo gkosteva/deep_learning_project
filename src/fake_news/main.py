@@ -5,44 +5,44 @@ from typing import List, Optional, Tuple
 import torch
 from torch.utils.data import DataLoader
 
-from .config import ExperimentConfig, LSTMConfig
-from .data.dataset import (FakeNewsDataset, generate_synthetic_dataset, load_isot,
-                           stratified_split)
-from .data.embeddings import build_embedding_matrix, load_or_synthesize_glove
+from .config import ExperimentConfig, RNNConfig
+from .data.dataset import LiarDataset, generate_synthetic_liar, label_column, load_liar, \
+    select_text
+from .data.embeddings import build_embedding_matrix, resolve_embeddings
 from .data.preprocessing import Vocabulary
+from .inference import save_rnn_artifact
 from .models.baseline import MajorityClassClassifier
-from .models.lstm_classifier import LSTMClassifier
-from .reporting.plots import (plot_class_distribution, plot_confusion_matrix,
-                              plot_text_length_histogram, plot_training_curves)
+from .models.rnn_classifier import RNNClassifier
+from .models.tfidf_classifier import TfidfLogisticClassifier
+from .reporting.plots import plot_class_distribution, plot_confusion_matrix, \
+    plot_text_length_histogram, plot_training_curves
 from .reporting.report_card import ExperimentRecord, ModelReport
 from .training.metrics import confusion_matrix, evaluate_classification
 from .training.trainer import Trainer, TrainingHistory
 
-POSITIVE_LABEL = 0
 
-
-def load_dataframe(config: ExperimentConfig):
-    data_source = config.data.data_source
-    if data_source not in ('auto', 'real', 'synthetic'):
-        raise ValueError("data_source must be 'auto', 'real' or 'synthetic', "
-                         f'got {data_source!r}')
-
-    if data_source == 'synthetic':
-        return generate_synthetic_dataset(seed=config.data.seed), 'synthetic'
-    if data_source == 'real':
-        return load_isot(config.data.fake_path, config.data.true_path), 'ISOT'
+def load_data(config: ExperimentConfig):
     try:
-        return load_isot(config.data.fake_path, config.data.true_path), 'ISOT'
+        train, val, test = load_liar(config.data.liar_dir)
+        return train, val, test, 'LIAR'
     except FileNotFoundError:
-        return generate_synthetic_dataset(seed=config.data.seed), 'synthetic'
+        frame = generate_synthetic_liar(seed=config.data.seed)
+        n = len(frame)
+        train = frame.iloc[:int(0.7 * n)].reset_index(drop=True)
+        val = frame.iloc[int(0.7 * n):int(0.85 * n)].reset_index(drop=True)
+        test = frame.iloc[int(0.85 * n):].reset_index(drop=True)
+        return train, val, test, 'synthetic'
 
 
-def resolve_output_paths(config: ExperimentConfig, source_label: str) -> Tuple[str, str]:
-    label = source_label.lower()
-    base, extension = os.path.splitext(config.report_path)
-    report_path = f'{base}_{label}{extension}'
-    figures_dir = os.path.join(config.figures_dir, label)
-    return report_path, figures_dir
+def make_splits(frames, config: ExperimentConfig):
+    train_df, val_df, test_df = frames
+    column = label_column(config.data.task)
+    use_meta = config.data.use_metadata
+    return (
+        (select_text(train_df, use_meta), train_df[column].tolist()),
+        (select_text(val_df, use_meta), val_df[column].tolist()),
+        (select_text(test_df, use_meta), test_df[column].tolist()),
+    )
 
 
 def build_vocabulary(train_texts: List[str], config: ExperimentConfig) -> Vocabulary:
@@ -55,13 +55,13 @@ def build_vocabulary(train_texts: List[str], config: ExperimentConfig) -> Vocabu
 
 def make_dataloader(texts, labels, vocabulary, config: ExperimentConfig, batch_size: int,
                     shuffle: bool) -> DataLoader:
-    dataset = FakeNewsDataset(texts, labels, vocabulary, config.data.max_sequence_length)
+    dataset = LiarDataset(texts, labels, vocabulary, config.data.max_sequence_length)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
-def run_lstm_experiment(
+def run_rnn_experiment(
     name: str,
-    lstm_config: LSTMConfig,
+    rnn_config: RNNConfig,
     splits,
     vocabulary: Vocabulary,
     config: ExperimentConfig,
@@ -69,166 +69,247 @@ def run_lstm_experiment(
     device: Optional[torch.device] = None,
     pretrained_embeddings: Optional[torch.Tensor] = None,
     freeze_embeddings: bool = False,
-) -> Tuple[ExperimentRecord, TrainingHistory, List[int], List[int]]:
+) -> Tuple[ExperimentRecord, TrainingHistory, List[int], List[int], RNNClassifier]:
     torch.manual_seed(config.data.seed)
     (train_texts, train_labels), (val_texts, val_labels), (test_texts, test_labels) = splits
+    num_classes = config.num_classes
 
     train_loader = make_dataloader(train_texts,
                                    train_labels,
                                    vocabulary,
                                    config,
-                                   lstm_config.batch_size,
+                                   rnn_config.batch_size,
                                    shuffle=True)
     val_loader = make_dataloader(val_texts,
                                  val_labels,
                                  vocabulary,
                                  config,
-                                 lstm_config.batch_size,
+                                 rnn_config.batch_size,
                                  shuffle=False)
     test_loader = make_dataloader(test_texts,
                                   test_labels,
                                   vocabulary,
                                   config,
-                                  lstm_config.batch_size,
+                                  rnn_config.batch_size,
                                   shuffle=False)
 
-    model = LSTMClassifier(
+    model = RNNClassifier(
         vocab_size=len(vocabulary),
-        embedding_dim=lstm_config.embedding_dim,
-        hidden_size=lstm_config.hidden_size,
-        num_layers=lstm_config.num_layers,
-        bidirectional=lstm_config.bidirectional,
-        dropout=lstm_config.dropout,
+        embedding_dim=rnn_config.embedding_dim,
+        hidden_size=rnn_config.hidden_size,
+        num_layers=rnn_config.num_layers,
+        num_classes=num_classes,
+        rnn_type=rnn_config.rnn_type,
+        bidirectional=rnn_config.bidirectional,
+        dropout=rnn_config.dropout,
         pad_id=vocabulary.pad_id,
         pretrained_embeddings=pretrained_embeddings,
         freeze_embeddings=freeze_embeddings,
     )
     trainer = Trainer(model,
-                      lstm_config.learning_rate,
+                      rnn_config.learning_rate,
                       device=device,
-                      positive_label=POSITIVE_LABEL,
-                      weight_decay=lstm_config.weight_decay)
-    history = trainer.fit(train_loader, val_loader, lstm_config.epochs, lstm_config.patience)
+                      num_classes=num_classes,
+                      weight_decay=rnn_config.weight_decay)
+    history = trainer.fit(train_loader, val_loader, rnn_config.epochs, rnn_config.patience)
     references, predictions = trainer.predict(test_loader)
-    metrics = evaluate_classification(references, predictions, POSITIVE_LABEL)
+    metrics = evaluate_classification(references, predictions, num_classes)
 
-    hyperparameters = lstm_config.as_report_columns()
+    hyperparameters = rnn_config.as_report_columns()
     hyperparameters['parameters'] = model.count_parameters()
     record = ExperimentRecord(name=name,
                               hyperparameters=hyperparameters,
                               metrics=metrics,
                               comment=comment)
-    return record, history, references, predictions
+    return record, history, references, predictions, model
 
 
-def run(config: Optional[ExperimentConfig] = None) -> int:
-    config = config or ExperimentConfig()
-    frame, source = load_dataframe(config)
-    print(f'Loaded {len(frame)} articles from the {source} source.')
-
-    train_df, val_df, test_df = stratified_split(frame, config.data.val_size,
-                                                 config.data.test_size, config.data.seed)
-    splits = (
-        (train_df['text'].tolist(), train_df['label'].tolist()),
-        (val_df['text'].tolist(), val_df['label'].tolist()),
-        (test_df['text'].tolist(), test_df['label'].tolist()),
+def run_tfidf_experiment(
+        splits, config: ExperimentConfig) -> Tuple[ExperimentRecord, List[int], List[int]]:
+    (train_texts, train_labels), _, (test_texts, test_labels) = splits
+    model = TfidfLogisticClassifier(max_features=config.data.max_vocab_size, seed=config.data.seed)
+    model.fit(train_texts, train_labels)
+    predictions = model.predict(test_texts)
+    metrics = evaluate_classification(test_labels, predictions, config.num_classes)
+    record = ExperimentRecord(
+        name='TF-IDF + Logistic Regression',
+        hyperparameters={
+            'features': 'tfidf 1-2gram',
+            'classifier': 'logreg'
+        },
+        metrics=metrics,
+        comment='Sparse bag-of-words baseline embedding; strong, cheap reference for the RNNs.',
     )
-    vocabulary = build_vocabulary(splits[0][0], config)
+    return record, test_labels, predictions
 
-    report = ModelReport(title=f'Model Report - Fake News Detection ({source} data)',
-                         main_metric='f1')
+
+def run_transformer_experiment(name: str, model_name: str, splits, config: ExperimentConfig,
+                               comment: str) -> Optional[ExperimentRecord]:  # pragma: no cover
+    try:
+        from .models.transformer_classifier import fine_tune_transformer
+    except ImportError:
+        print(f'transformers not available; skipping {name}.')
+        return None
+
+    (train_texts, train_labels), _, (test_texts, test_labels) = splits
+    transformer_config = replace(config.transformer, model_name=model_name)
+    train_texts = train_texts[:transformer_config.train_subset]
+    train_labels = train_labels[:transformer_config.train_subset]
+    eval_texts = test_texts[:transformer_config.eval_subset]
+    eval_labels = test_labels[:transformer_config.eval_subset]
+
+    predictions, summary = fine_tune_transformer(train_texts, train_labels, eval_texts,
+                                                 eval_labels, transformer_config,
+                                                 config.num_classes)
+    metrics = evaluate_classification(eval_labels, predictions, config.num_classes)
+    hyperparameters = transformer_config.as_report_columns()
+    hyperparameters.update(summary)
+    return ExperimentRecord(name=name,
+                            hyperparameters=hyperparameters,
+                            metrics=metrics,
+                            comment=comment)
+
+
+def _embedding_experiment(kind: str, splits, vocabulary, config: ExperimentConfig):
+    dim = config.data.embedding_dim
+    path = {
+        'glove': config.data.glove_path,
+        'word2vec': config.data.word2vec_path,
+        'fasttext': config.data.fasttext_path,
+    }.get(kind, '')
+    vectors, source = resolve_embeddings(kind, vocabulary, splits[0][0], dim, config.data.seed,
+                                         path)
+    matrix = torch.tensor(build_embedding_matrix(vocabulary, vectors, dim, config.data.seed))
+    rnn_config = replace(config.rnn,
+                         rnn_type='lstm',
+                         embedding_dim=dim,
+                         hidden_size=128,
+                         bidirectional=True,
+                         dropout=0.3)
+    record, history, refs, preds, model = run_rnn_experiment(
+        f'BiLSTM + {kind} ({source})',
+        rnn_config,
+        splits,
+        vocabulary,
+        config,
+        f'Embedding technique experiment: {kind} vectors ({source}) feeding a BiLSTM.',
+        pretrained_embeddings=matrix,
+    )
+    record.hyperparameters['embeddings'] = source
+    return record, history, refs, preds, model
+
+
+def run(config: Optional[ExperimentConfig] = None, include_transformers: bool = False) -> int:
+    config = config or ExperimentConfig()
+    train_df, val_df, test_df, source = load_data(config)
+    frames = (train_df, val_df, test_df)
+    print(f'Loaded LIAR-style data ({source}): '
+          f'{len(train_df)} train / {len(val_df)} val / {len(test_df)} test statements.')
+
+    splits = make_splits(frames, config)
+    vocabulary = build_vocabulary(splits[0][0], config)
+    num_classes = config.num_classes
+    class_names = config.class_names
+
+    report = ModelReport(
+        title=f'Model Report - LIAR Fake News Detection ({config.data.task}-class, {source})',
+        main_metric='macro_f1')
 
     baseline = MajorityClassClassifier().fit(splits[0][1])
     baseline_predictions = baseline.predict(splits[2][0])
-    baseline_metrics = evaluate_classification(splits[2][1], baseline_predictions, POSITIVE_LABEL)
+    baseline_metrics = evaluate_classification(splits[2][1], baseline_predictions, num_classes)
     report.add(
         ExperimentRecord(
             name='Baseline (majority class)',
             hyperparameters={
-                'data': source,
+                'task': config.data.task,
                 'strategy': 'most_frequent'
             },
             metrics=baseline_metrics,
-            comment=('Greediest statistical model: always predicts the majority class. '
-                     'Reference point for every other model.'),
+            comment='Greediest statistical model: always predicts the majority class.',
         ))
 
-    base = config.lstm
-    bigger = replace(base,
-                     embedding_dim=128,
-                     hidden_size=128,
-                     num_layers=2,
-                     bidirectional=True,
-                     dropout=0.3)
-    experiments = [
-        ('LSTM (main model)', base,
-         'Embedding + single-layer LSTM. First real model in the journey.'),
-        ('LSTM + dropout', replace(base, dropout=0.3),
-         'Improvement 1: dropout 0.3 regularises the network to fight overfitting.'),
-        ('BiLSTM + dropout', replace(base, dropout=0.3, bidirectional=True),
-         'Improvement 2: bidirectional LSTM reads context both ways for richer features.'),
-        ('Wider & deeper BiLSTM', bigger,
-         'Improvement 3: more capacity - wider embeddings/hidden state and a second '
-         'LSTM layer.'),
-        ('Wider BiLSTM + AdamW weight decay', replace(bigger, weight_decay=0.01),
-         'Improvement 4: AdamW weight decay 0.01 regularises the larger model.'),
+    base = config.rnn
+    rnn_specs = [
+        ('LSTM (learned embedding)', replace(base, rnn_type='lstm'),
+         'Main model: learned Embedding layer + single-layer LSTM, masked mean pooling.'),
+        ('GRU (learned embedding)', replace(base, rnn_type='gru'),
+         'GRU variant: lighter gating than the LSTM on the same setup.'),
+        ('BiLSTM + dropout', replace(base, rnn_type='lstm', bidirectional=True, dropout=0.3),
+         'Bidirectional LSTM with dropout reads context both ways and regularises.'),
+        ('BiGRU + dropout', replace(base, rnn_type='gru', bidirectional=True, dropout=0.3),
+         'Bidirectional GRU with dropout: the GRU counterpart of the BiLSTM.'),
+        ('Wider & deeper BiLSTM',
+         replace(base,
+                 rnn_type='lstm',
+                 hidden_size=192,
+                 num_layers=2,
+                 bidirectional=True,
+                 dropout=0.3,
+                 weight_decay=0.01),
+         'More capacity: wider hidden state, two layers, dropout and AdamW weight decay.'),
     ]
 
-    results = [
-        run_lstm_experiment(name, lstm_config, splits, vocabulary, config, comment)
-        for name, lstm_config, comment in experiments
+    rnn_results = [
+        run_rnn_experiment(name, cfg, splits, vocabulary, config, comment)
+        for name, cfg, comment in rnn_specs
     ]
-    results.append(_run_glove_experiment(config, splits, vocabulary))
-    for record, _, _, _ in results:
-        record.hyperparameters['data'] = source
+
+    embedding_results = [
+        _embedding_experiment(kind, splits, vocabulary, config)
+        for kind in ('word2vec', 'glove', 'fasttext')
+    ]
+
+    tfidf_record, tfidf_refs, tfidf_preds = run_tfidf_experiment(splits, config)
+    report.add(tfidf_record)
+
+    neural_results = rnn_results + embedding_results
+    for record, *_ in neural_results:
         report.add(record)
 
-    best_index = max(range(len(results)), key=lambda i: results[i][0].metrics['f1'])
-    _, best_history, best_refs, best_preds = results[best_index]
+    if include_transformers:  # pragma: no cover
+        for name, model_name, comment in (
+            ('BERT (fine-tuned)', 'bert-base-uncased', 'BERT architecture fine-tuned on LIAR.'),
+            ('RoBERTa (fine-tuned)', 'roberta-base', 'RoBERTa architecture fine-tuned on LIAR.'),
+            ('DistilBERT (fine-tuned)', 'distilbert-base-uncased',
+             'Distilled BERT fine-tuned on LIAR.'),
+            ('GPT-2 (fine-tuned)', 'gpt2', 'GPT architecture fine-tuned on LIAR.'),
+        ):
+            record = run_transformer_experiment(name, model_name, splits, config, comment)
+            if record is not None:
+                report.add(record)
 
-    report_path, figures_dir = resolve_output_paths(config, source)
+    best_index = max(range(len(neural_results)),
+                     key=lambda i: neural_results[i][0].metrics['macro_f1'])
+    best_record, best_history, best_refs, best_preds, best_model = neural_results[best_index]
+
+    figures_dir = os.path.join(config.figures_dir, config.data.task)
     figure_config = replace(config, figures_dir=figures_dir)
-    diagram_paths = _generate_figures(figure_config, splits, best_history, best_refs, best_preds)
-    examples = _collect_examples(splits[2][0], best_refs, best_preds)
+    diagram_paths = _generate_figures(figure_config, splits, best_history, best_refs, best_preds,
+                                      class_names)
+    examples = _collect_examples(splits[2][0], best_refs, best_preds, class_names)
+
+    base_report, ext = os.path.splitext(config.report_path)
+    report_path = f'{base_report}_{config.data.task}{ext}'
     saved_path = report.save(report_path, diagram_paths=diagram_paths[-2:], examples=examples)
     print(f'Report written to {saved_path}.')
+
+    save_rnn_artifact(best_model, vocabulary, config, best_record.name)
+    print(f'Best model ({best_record.name}) saved for the Streamlit app.')
     return 0
 
 
-def _run_glove_experiment(config: ExperimentConfig, splits, vocabulary: Vocabulary):
-    vectors, source = load_or_synthesize_glove(config.data.glove_path, vocabulary,
-                                               config.data.glove_dim, config.data.seed)
-    matrix = build_embedding_matrix(vocabulary, vectors, config.data.glove_dim, config.data.seed)
-    embeddings = torch.tensor(matrix)
-    glove_config = replace(config.lstm,
-                           embedding_dim=config.data.glove_dim,
-                           hidden_size=128,
-                           bidirectional=True,
-                           dropout=0.3)
-    record, history, references, predictions = run_lstm_experiment(
-        'BiLSTM + GloVe (fine-tuned)',
-        glove_config,
-        splits,
-        vocabulary,
-        config,
-        f'Improvement 5: embedding layer initialised from GloVe ({source}) vectors '
-        'and fine-tuned.',
-        pretrained_embeddings=embeddings,
-    )
-    record.hyperparameters['embeddings'] = f'glove-{source}'
-    return record, history, references, predictions
-
-
-def _generate_figures(config, splits, history, references, predictions) -> List[str]:
+def _generate_figures(config, splits, history, references, predictions, class_names) -> List[str]:
     figures_dir = config.figures_dir
     os.makedirs(figures_dir, exist_ok=True)
     all_labels = splits[0][1] + splits[1][1] + splits[2][1]
     all_texts = splits[0][0] + splits[1][0] + splits[2][0]
     paths = [
-        plot_class_distribution(all_labels, os.path.join(figures_dir, 'class_distribution.png')),
+        plot_class_distribution(all_labels, os.path.join(figures_dir, 'class_distribution.png'),
+                                class_names),
         plot_text_length_histogram(all_texts, os.path.join(figures_dir, 'text_lengths.png')),
-        plot_confusion_matrix(confusion_matrix(references, predictions),
-                              os.path.join(figures_dir, 'confusion_matrix.png')),
+        plot_confusion_matrix(confusion_matrix(references, predictions, len(class_names)),
+                              os.path.join(figures_dir, 'confusion_matrix.png'), class_names),
     ]
     if history is not None:
         paths.extend(
@@ -237,12 +318,12 @@ def _generate_figures(config, splits, history, references, predictions) -> List[
     return paths
 
 
-def _collect_examples(texts, references, predictions, limit: int = 6):
-    correct = [(texts[i], references[i], predictions[i])
-               for i in range(len(references))
-               if references[i] == predictions[i]]
-    wrong = [(texts[i], references[i], predictions[i])
-             for i in range(len(references))
-             if references[i] != predictions[i]]
+def _collect_examples(texts, references, predictions, class_names, limit: int = 6):
+
+    def row(index):
+        return (texts[index], class_names[references[index]], class_names[predictions[index]])
+
+    correct = [row(i) for i in range(len(references)) if references[i] == predictions[i]]
+    wrong = [row(i) for i in range(len(references)) if references[i] != predictions[i]]
     half = limit // 2
     return correct[:half] + wrong[:limit - half]

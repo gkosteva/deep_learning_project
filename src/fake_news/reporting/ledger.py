@@ -39,7 +39,7 @@ def load_records(jsonl_path: str) -> List[ExperimentRecord]:
     return records
 
 
-def rebuild_report(jsonl_path: str, report_path: str, main_metric: str = 'f1') -> str:
+def rebuild_report(jsonl_path: str, report_path: str, main_metric: str = 'macro_f1') -> str:
     report = ModelReport(main_metric=main_metric)
     for record in load_records(jsonl_path):
         report.add(record)

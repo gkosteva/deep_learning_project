@@ -1,32 +1,19 @@
 import unittest
 
-from src.fake_news.data.preprocessing import (PAD_TOKEN, UNK_TOKEN, Vocabulary, clean_text,
-                                              strip_source_leakage, tokenize)
-
-
-class TestStripSourceLeakage(unittest.TestCase):
-
-    def test_when_reuters_dateline_present_then_it_is_removed(self):
-        text = 'WASHINGTON (Reuters) - The senate voted today.'
-        self.assertEqual(strip_source_leakage(text), 'The senate voted today.')
-
-    def test_when_no_dateline_then_text_is_unchanged(self):
-        text = 'Breaking: aliens land in Sofia!'
-        self.assertEqual(strip_source_leakage(text), text)
+from src.fake_news.data.preprocessing import PAD_TOKEN, UNK_TOKEN, Vocabulary, clean_text, tokenize
 
 
 class TestCleanText(unittest.TestCase):
 
     def test_when_text_has_urls_and_punctuation_then_they_are_removed(self):
         text = 'Visit https://example.com NOW!!! Amazing, deal.'
-        cleaned = clean_text(text, strip_leakage=False)
+        cleaned = clean_text(text)
         self.assertNotIn('http', cleaned)
         self.assertNotIn('!', cleaned)
         self.assertEqual(cleaned, 'visit now amazing deal')
 
-    def test_when_strip_leakage_true_then_dateline_is_dropped(self):
-        text = 'LONDON (Reuters) - Markets rose sharply.'
-        self.assertEqual(clean_text(text, strip_leakage=True), 'markets rose sharply')
+    def test_when_text_has_digits_then_they_are_kept(self):
+        self.assertEqual(clean_text('Spending rose 25 percent'), 'spending rose 25 percent')
 
     def test_when_text_is_none_then_value_error_is_raised(self):
         with self.assertRaises(ValueError):

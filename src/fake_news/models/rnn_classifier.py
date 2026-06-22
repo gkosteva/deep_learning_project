@@ -3,16 +3,20 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
+RNN_TYPES = ('lstm', 'gru')
 
-class LSTMClassifier(nn.Module):
+
+class RNNClassifier(nn.Module):
+    """An embedding + (Bi)LSTM/(Bi)GRU classifier with masked mean pooling."""
 
     def __init__(
         self,
         vocab_size: int,
-        embedding_dim: int = 64,
-        hidden_size: int = 64,
+        embedding_dim: int = 100,
+        hidden_size: int = 128,
         num_layers: int = 1,
-        num_classes: int = 2,
+        num_classes: int = 6,
+        rnn_type: str = 'lstm',
         bidirectional: bool = False,
         dropout: float = 0.0,
         pad_id: int = 0,
@@ -24,13 +28,18 @@ class LSTMClassifier(nn.Module):
             raise ValueError('vocab_size must be positive')
         if num_classes < 2:
             raise ValueError('num_classes must be at least 2')
+        if rnn_type not in RNN_TYPES:
+            raise ValueError(f'rnn_type must be one of {RNN_TYPES}, got {rnn_type!r}')
 
         self.pad_id = pad_id
+        self.rnn_type = rnn_type
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=pad_id)
         if pretrained_embeddings is not None:
             self._load_pretrained_embeddings(pretrained_embeddings, vocab_size, embedding_dim,
                                              freeze_embeddings)
-        self.lstm = nn.LSTM(
+
+        rnn_class = nn.LSTM if rnn_type == 'lstm' else nn.GRU
+        self.rnn = rnn_class(
             input_size=embedding_dim,
             hidden_size=hidden_size,
             num_layers=num_layers,
@@ -54,7 +63,7 @@ class LSTMClassifier(nn.Module):
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         embedded = self.embedding(token_ids)
-        outputs, _ = self.lstm(embedded)
+        outputs, _ = self.rnn(embedded)
         mask = (token_ids != self.pad_id).unsqueeze(-1).to(outputs.dtype)
         summed = (outputs * mask).sum(dim=1)
         counts = mask.sum(dim=1).clamp(min=1.0)

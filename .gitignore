@@ -37,10 +37,11 @@ data/raw/*.csv
 data/raw/*.txt
 data/processed/
 
-# Generated reports and figures
+# Generated reports, figures and model artifacts
 reports/*.xlsx
 reports/records.jsonl
-reports/figures/*.png
+reports/figures/
+reports/artifacts/
 
 # Hugging Face caches
 .cache/

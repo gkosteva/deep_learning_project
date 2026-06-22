@@ -9,6 +9,8 @@ torch
 transformers
 datasets
 evaluate
+gensim
+streamlit
 coverage
 pytest
 yapf

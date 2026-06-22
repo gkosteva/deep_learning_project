@@ -5,21 +5,14 @@ from typing import Dict, List
 PAD_TOKEN = '<pad>'
 UNK_TOKEN = '<unk>'
 
-_REUTERS_DATELINE = re.compile(r'^.*?\(Reuters\)\s*-\s*', flags=re.IGNORECASE)
 _URL = re.compile(r'https?://\S+|www\.\S+')
-_NON_LETTER = re.compile(r"[^a-z\s']")
+_NON_LETTER = re.compile(r"[^a-z0-9\s']")
 _MULTISPACE = re.compile(r'\s+')
 
 
-def strip_source_leakage(text: str) -> str:
-    return _REUTERS_DATELINE.sub('', text, count=1)
-
-
-def clean_text(text: str, strip_leakage: bool = True) -> str:
+def clean_text(text: str) -> str:
     if text is None:
         raise ValueError('text must not be None')
-    if strip_leakage:
-        text = strip_source_leakage(text)
     text = text.lower()
     text = _URL.sub(' ', text)
     text = _NON_LETTER.sub(' ', text)
@@ -68,7 +61,6 @@ class Vocabulary:
         max_size: int = 20000,
         min_frequency: int = 1,
     ) -> 'Vocabulary':
-        
         counter: Counter = Counter()
         for text in texts:
             counter.update(tokenize(text))

@@ -1,84 +1,118 @@
+import csv
 import os
 from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 
+from ..config import LABELS_SIX, SIX_TO_BINARY
 from .preprocessing import Vocabulary
 
-LABEL_FAKE = 0
-LABEL_REAL = 1
-
-
-def _combine_title_and_text(frame: pd.DataFrame) -> pd.Series:
-    title = frame.get('title', pd.Series([''] * len(frame))).fillna('')
-    body = frame.get('text', pd.Series([''] * len(frame))).fillna('')
-    return (title + '. ' + body).str.strip()
-
-
-def load_isot(fake_path: str, true_path: str) -> pd.DataFrame:
-    if not os.path.exists(fake_path):
-        raise FileNotFoundError(f'fake news file not found: {fake_path}')
-    if not os.path.exists(true_path):
-        raise FileNotFoundError(f'true news file not found: {true_path}')
-
-    fake = pd.read_csv(fake_path)
-    true = pd.read_csv(true_path)
-    fake_text = _combine_title_and_text(fake)
-    true_text = _combine_title_and_text(true)
-
-    frame = pd.DataFrame({
-        'text': pd.concat([fake_text, true_text], ignore_index=True),
-        'label': [LABEL_FAKE] * len(fake_text) + [LABEL_REAL] * len(true_text),
-    })
-    return frame
-
-
-# A neutral, letters-only vocabulary shared by both classes
-_SYNTHETIC_VOCABULARY = [
-    'time',
-    'people',
-    'year',
-    'way',
-    'day',
-    'thing',
-    'world',
-    'school',
-    'state',
-    'family',
-    'student',
-    'group',
-    'country',
-    'problem',
-    'hand',
-    'place',
-    'case',
-    'week',
-    'company',
-    'system',
-    'program',
-    'question',
-    'work',
-    'government',
-    'number',
-    'night',
-    'point',
-    'home',
-    'water',
-    'room',
-    'area',
-    'money',
-    'story',
-    'fact',
-    'month',
-    'right',
-    'study',
-    'book',
+LIAR_COLUMNS = [
+    'id',
+    'label',
+    'statement',
+    'subject',
+    'speaker',
     'job',
-    'word',
+    'state',
+    'party',
+    'barely_true_count',
+    'false_count',
+    'half_true_count',
+    'mostly_true_count',
+    'pants_on_fire_count',
+    'context',
+]
+
+CREDIT_COLUMNS = [
+    'barely_true_count',
+    'false_count',
+    'half_true_count',
+    'mostly_true_count',
+    'pants_on_fire_count',
+]
+
+METADATA_TEXT_COLUMNS = ['subject', 'speaker', 'job', 'state', 'party', 'context']
+
+_LABEL_TO_SIX = {label: index for index, label in enumerate(LABELS_SIX)}
+
+
+def _build_meta_text(frame: pd.DataFrame) -> pd.Series:
+    parts = [frame[column].fillna('').astype(str) for column in METADATA_TEXT_COLUMNS]
+    combined = parts[0]
+    for part in parts[1:]:
+        combined = combined + ' ' + part
+    return combined.str.replace(',', ' ', regex=False).str.strip()
+
+
+def _finalise_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    frame = frame[frame['label'].isin(_LABEL_TO_SIX)].copy()
+    frame['statement'] = frame['statement'].fillna('').astype(str)
+    frame['label_six'] = frame['label'].map(_LABEL_TO_SIX).astype(int)
+    frame['label_binary'] = frame['label_six'].map(SIX_TO_BINARY).astype(int)
+    for column in CREDIT_COLUMNS:
+        frame[column] = pd.to_numeric(frame[column], errors='coerce').fillna(0).astype(int)
+    frame['meta_text'] = _build_meta_text(frame)
+    return frame.reset_index(drop=True)
+
+
+def load_liar_split(path: str) -> pd.DataFrame:
+    if not os.path.exists(path):
+        raise FileNotFoundError(f'LIAR split not found: {path}')
+    frame = pd.read_csv(
+        path,
+        sep='\t',
+        header=None,
+        names=LIAR_COLUMNS,
+        quoting=csv.QUOTE_NONE,
+        dtype=str,
+        keep_default_na=False,
+    )
+    return _finalise_frame(frame)
+
+
+def load_liar(liar_dir: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    train = load_liar_split(os.path.join(liar_dir, 'train.tsv'))
+    val = load_liar_split(os.path.join(liar_dir, 'valid.tsv'))
+    test = load_liar_split(os.path.join(liar_dir, 'test.tsv'))
+    return train, val, test
+
+
+# Neutral vocabulary for the offline synthetic fallback corpus.
+_SYNTHETIC_VOCABULARY = [
+    'budget',
+    'tax',
+    'health',
+    'jobs',
+    'economy',
+    'education',
+    'crime',
+    'energy',
+    'voters',
+    'senate',
+    'congress',
+    'percent',
+    'million',
+    'billion',
+    'plan',
+    'claim',
+    'report',
+    'study',
+    'state',
+    'federal',
+    'increase',
+    'decrease',
+    'spending',
+    'policy',
+    'rate',
+    'people',
+    'program',
+    'reform',
+    'bill',
+    'law',
 ]
 
 
@@ -88,69 +122,58 @@ def _softmax(values: np.ndarray) -> np.ndarray:
     return exponentiated / exponentiated.sum()
 
 
-def generate_synthetic_dataset(
-    n_per_class: int = 300,
-    seed: int = 42,
-    separation: float = 0.7,
-    noise: float = 0.12,
-) -> pd.DataFrame:
+def generate_synthetic_liar(n_per_class: int = 120, seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     vocabulary = np.array(_SYNTHETIC_VOCABULARY)
     base = rng.normal(size=len(vocabulary))
-    shift = rng.normal(size=len(vocabulary))
-    distributions = {
-        LABEL_FAKE: _softmax(base + separation * shift),
-        LABEL_REAL: _softmax(base - separation * shift),
-    }
+    shifts = [rng.normal(size=len(vocabulary)) for _ in LABELS_SIX]
+    distributions = [_softmax(base + 0.6 * shift) for shift in shifts]
 
-    def make(label: int) -> str:
-        source = 1 - label if rng.random() < noise else label
-        length = int(rng.integers(12, 30))
-        chosen = rng.choice(vocabulary, size=length, replace=True, p=distributions[source])
-        return ' '.join(chosen)
-
-    rows = []
-    for _ in range(n_per_class):
-        rows.append({'text': make(LABEL_FAKE), 'label': LABEL_FAKE})
-        rows.append({'text': make(LABEL_REAL), 'label': LABEL_REAL})
+    rows: List[dict] = []
+    for label_index, label in enumerate(LABELS_SIX):
+        for _ in range(n_per_class):
+            length = int(rng.integers(8, 24))
+            chosen = rng.choice(vocabulary,
+                                size=length,
+                                replace=True,
+                                p=distributions[label_index])
+            rows.append({
+                'id': f'{label_index}-{len(rows)}.json',
+                'label': label,
+                'statement': ' '.join(chosen),
+                'subject': 'economy',
+                'speaker': f'speaker-{label_index}',
+                'job': 'politician',
+                'state': 'Texas',
+                'party': 'republican' if label_index % 2 else 'democrat',
+                'barely_true_count': int(rng.integers(0, 20)),
+                'false_count': int(rng.integers(0, 20)),
+                'half_true_count': int(rng.integers(0, 20)),
+                'mostly_true_count': int(rng.integers(0, 20)),
+                'pants_on_fire_count': int(rng.integers(0, 10)),
+                'context': 'a speech',
+            })
     frame = pd.DataFrame(rows)
-    return frame.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+    frame = frame.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+    return _finalise_frame(frame)
 
 
-def stratified_split(
-    frame: pd.DataFrame,
-    val_size: float,
-    test_size: float,
-    seed: int,
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    if not 0 < test_size < 1:
-        raise ValueError('test_size must be in (0, 1)')
-    if not 0 < val_size < 1:
-        raise ValueError('val_size must be in (0, 1)')
-    if val_size + test_size >= 1:
-        raise ValueError('val_size + test_size must be < 1')
-
-    train_val, test = train_test_split(
-        frame,
-        test_size=test_size,
-        random_state=seed,
-        stratify=frame['label'],
-    )
-    relative_val = val_size / (1.0 - test_size)
-    train, val = train_test_split(
-        train_val,
-        test_size=relative_val,
-        random_state=seed,
-        stratify=train_val['label'],
-    )
-    return (
-        train.reset_index(drop=True),
-        val.reset_index(drop=True),
-        test.reset_index(drop=True),
-    )
+def label_column(task: str) -> str:
+    if task == 'six':
+        return 'label_six'
+    if task == 'binary':
+        return 'label_binary'
+    raise ValueError(f"task must be 'six' or 'binary', got {task!r}")
 
 
-class FakeNewsDataset(Dataset):
+def select_text(frame: pd.DataFrame, use_metadata: bool) -> List[str]:
+    if use_metadata:
+        combined = frame['statement'].astype(str) + ' ' + frame['meta_text'].astype(str)
+        return combined.str.strip().tolist()
+    return frame['statement'].astype(str).tolist()
+
+
+class LiarDataset(Dataset):
 
     def __init__(
         self,
