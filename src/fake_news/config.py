@@ -102,6 +102,7 @@ class ExperimentConfig:
     transformer: TransformerConfig = field(default_factory=TransformerConfig)
     report_path: str = 'reports/model_report.xlsx'
     figures_dir: str = 'reports/figures'
+    artifact_dir: str = 'reports/artifacts'
 
     @property
     def num_classes(self) -> int:

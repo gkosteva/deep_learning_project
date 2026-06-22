@@ -57,7 +57,7 @@ slide.
 
 ## Slide 12 - Testing & engineering
 - BDD unit tests, 100% coverage; yapf/isort/mypy clean
-- Reproducible (fixed seeds), runs out-of-the-box with a synthetic fallback
+- Reproducible (fixed seeds); GloVe/TF-IDF fallbacks keep it runnable offline
 
 ## Slide 13 - Limitations & future work
 - English only, no external evidence, subjective scale

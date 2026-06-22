@@ -2,8 +2,8 @@ import re
 from collections import Counter
 from typing import Dict, List
 
-PAD_TOKEN = '<pad>'
-UNK_TOKEN = '<unk>'
+PAD_TOKEN = '<pad>'  # structural filler — it carries no meaning, so the model must learn to ignore it.
+UNK_TOKEN = '<unk>'  # token for unknown words
 
 _URL = re.compile(r'https?://\S+|www\.\S+')
 _NON_LETTER = re.compile(r"[^a-z0-9\s']")
@@ -52,7 +52,7 @@ class Vocabulary:
         ids = [self.token_to_id.get(token, self.unk_id) for token in tokenize(text)]
         ids = ids[:max_length]
         padding = [self.pad_id] * (max_length - len(ids))
-        return ids + padding
+        return ids + padding  # for identical lenght tensors
 
     @classmethod
     def build(
@@ -63,7 +63,8 @@ class Vocabulary:
     ) -> 'Vocabulary':
         counter: Counter = Counter()
         for text in texts:
-            counter.update(tokenize(text))
+            counter.update(
+                tokenize(text))  # takes a list and increments the count of every element
 
         token_to_id = {PAD_TOKEN: 0, UNK_TOKEN: 1}
         eligible = [(token, count) for token, count in counter.items() if count >= min_frequency]

@@ -142,7 +142,7 @@ deep_learning_project/
     app_support.py             pure helpers for the UI
     data/
       preprocessing.py         clean_text, tokenize, Vocabulary
-      dataset.py               LIAR loader, synthetic fallback, Dataset
+      dataset.py               LIAR loader, label maps, Dataset
       embeddings.py            TF-IDF/Word2Vec/GloVe/FastText vectors
     models/
       baseline.py              MajorityClassClassifier

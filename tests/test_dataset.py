@@ -2,8 +2,8 @@ import os
 import tempfile
 import unittest
 
-from src.fake_news.data.dataset import LiarDataset, generate_synthetic_liar, label_column, \
-    load_liar, load_liar_split, select_text
+from src.fake_news.data.dataset import LiarDataset, label_column, load_liar, load_liar_split, \
+    select_text
 from src.fake_news.data.preprocessing import Vocabulary
 
 _ROW = '\t'.join([
@@ -55,18 +55,6 @@ class TestLoadLiar(unittest.TestCase):
         self.assertEqual((len(train), len(val), len(test)), (2, 1, 1))
 
 
-class TestGenerateSyntheticLiar(unittest.TestCase):
-
-    def test_when_called_then_every_label_is_present(self):
-        frame = generate_synthetic_liar(n_per_class=5, seed=1)
-        self.assertEqual(len(frame), 30)
-        self.assertEqual(frame['label_six'].nunique(), 6)
-
-    def test_when_called_then_binary_labels_only_zero_and_one(self):
-        frame = generate_synthetic_liar(n_per_class=4, seed=1)
-        self.assertEqual(set(frame['label_binary'].unique()), {0, 1})
-
-
 class TestLabelColumn(unittest.TestCase):
 
     def test_when_task_six_then_returns_six_column(self):
@@ -83,7 +71,9 @@ class TestLabelColumn(unittest.TestCase):
 class TestSelectText(unittest.TestCase):
 
     def setUp(self):
-        self.frame = generate_synthetic_liar(n_per_class=2, seed=1)
+        directory = tempfile.mkdtemp()
+        path = _write_split(directory, 'train.tsv', [_ROW, _ROW_TRUE])
+        self.frame = load_liar_split(path)
 
     def test_when_metadata_false_then_returns_statement(self):
         texts = select_text(self.frame, use_metadata=False)

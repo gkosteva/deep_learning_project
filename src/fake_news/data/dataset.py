@@ -2,7 +2,6 @@ import csv
 import os
 from typing import List, Tuple
 
-import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
@@ -49,10 +48,10 @@ def _build_meta_text(frame: pd.DataFrame) -> pd.Series:
 
 
 def _finalise_frame(frame: pd.DataFrame) -> pd.DataFrame:
-    frame = frame[frame['label'].isin(_LABEL_TO_SIX)].copy()
+    frame = frame[frame['label'].isin(_LABEL_TO_SIX)].copy()  # drop rows with invalid labels
     frame['statement'] = frame['statement'].fillna('').astype(str)
     frame['label_six'] = frame['label'].map(_LABEL_TO_SIX).astype(int)
-    frame['label_binary'] = frame['label_six'].map(SIX_TO_BINARY).astype(int)
+    frame['label_binary'] = frame['label_six'].map(SIX_TO_BINARY).astype(int)  # real/fake collapse
     for column in CREDIT_COLUMNS:
         frame[column] = pd.to_numeric(frame[column], errors='coerce').fillna(0).astype(int)
     frame['meta_text'] = _build_meta_text(frame)
@@ -79,83 +78,6 @@ def load_liar(liar_dir: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     val = load_liar_split(os.path.join(liar_dir, 'valid.tsv'))
     test = load_liar_split(os.path.join(liar_dir, 'test.tsv'))
     return train, val, test
-
-
-# Neutral vocabulary for the offline synthetic fallback corpus.
-_SYNTHETIC_VOCABULARY = [
-    'budget',
-    'tax',
-    'health',
-    'jobs',
-    'economy',
-    'education',
-    'crime',
-    'energy',
-    'voters',
-    'senate',
-    'congress',
-    'percent',
-    'million',
-    'billion',
-    'plan',
-    'claim',
-    'report',
-    'study',
-    'state',
-    'federal',
-    'increase',
-    'decrease',
-    'spending',
-    'policy',
-    'rate',
-    'people',
-    'program',
-    'reform',
-    'bill',
-    'law',
-]
-
-
-def _softmax(values: np.ndarray) -> np.ndarray:
-    shifted = values - values.max()
-    exponentiated = np.exp(shifted)
-    return exponentiated / exponentiated.sum()
-
-
-def generate_synthetic_liar(n_per_class: int = 120, seed: int = 42) -> pd.DataFrame:
-    rng = np.random.default_rng(seed)
-    vocabulary = np.array(_SYNTHETIC_VOCABULARY)
-    base = rng.normal(size=len(vocabulary))
-    shifts = [rng.normal(size=len(vocabulary)) for _ in LABELS_SIX]
-    distributions = [_softmax(base + 0.6 * shift) for shift in shifts]
-
-    rows: List[dict] = []
-    for label_index, label in enumerate(LABELS_SIX):
-        for _ in range(n_per_class):
-            length = int(rng.integers(8, 24))
-            chosen = rng.choice(vocabulary,
-                                size=length,
-                                replace=True,
-                                p=distributions[label_index])
-            rows.append({
-                'id': f'{label_index}-{len(rows)}.json',
-                'label': label,
-                'statement': ' '.join(chosen),
-                'subject': 'economy',
-                'speaker': f'speaker-{label_index}',
-                'job': 'politician',
-                'state': 'Texas',
-                'party': 'republican' if label_index % 2 else 'democrat',
-                'barely_true_count': int(rng.integers(0, 20)),
-                'false_count': int(rng.integers(0, 20)),
-                'half_true_count': int(rng.integers(0, 20)),
-                'mostly_true_count': int(rng.integers(0, 20)),
-                'pants_on_fire_count': int(rng.integers(0, 10)),
-                'context': 'a speech',
-            })
-    frame = pd.DataFrame(rows)
-    frame = frame.sample(frac=1.0, random_state=seed).reset_index(drop=True)
-    return _finalise_frame(frame)
 
 
 def label_column(task: str) -> str:

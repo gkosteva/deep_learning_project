@@ -28,8 +28,8 @@ python run.py --task six --transformers    # also fine-tune BERT/RoBERTa/DistilB
 
 Results are written to `reports/model_report_<task>.xlsx`, figures to
 `reports/figures/<task>/`, and the best model to
-`reports/artifacts/best_model_<task>.pt`. If the LIAR files are missing the
-pipeline falls back to a small synthetic corpus so it runs out of the box.
+`reports/artifacts/best_model_<task>.pt`. The LIAR splits are read from
+`data/raw/liar/`.
 
 The LIAR splits live in `data/raw/liar/` (`train.tsv`, `valid.tsv`,
 `test.tsv`). To use real GloVe vectors, drop `glove.6B.100d.txt` under

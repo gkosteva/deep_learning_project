@@ -6,8 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .config import ExperimentConfig, RNNConfig
-from .data.dataset import LiarDataset, generate_synthetic_liar, label_column, load_liar, \
-    select_text
+from .data.dataset import LiarDataset, label_column, load_liar, select_text
 from .data.embeddings import build_embedding_matrix, resolve_embeddings
 from .data.preprocessing import Vocabulary
 from .inference import save_rnn_artifact
@@ -22,16 +21,8 @@ from .training.trainer import Trainer, TrainingHistory
 
 
 def load_data(config: ExperimentConfig):
-    try:
-        train, val, test = load_liar(config.data.liar_dir)
-        return train, val, test, 'LIAR'
-    except FileNotFoundError:
-        frame = generate_synthetic_liar(seed=config.data.seed)
-        n = len(frame)
-        train = frame.iloc[:int(0.7 * n)].reset_index(drop=True)
-        val = frame.iloc[int(0.7 * n):int(0.85 * n)].reset_index(drop=True)
-        test = frame.iloc[int(0.85 * n):].reset_index(drop=True)
-        return train, val, test, 'synthetic'
+    train, val, test = load_liar(config.data.liar_dir)
+    return train, val, test, 'LIAR'
 
 
 def make_splits(frames, config: ExperimentConfig):
@@ -294,7 +285,11 @@ def run(config: Optional[ExperimentConfig] = None, include_transformers: bool = 
     saved_path = report.save(report_path, diagram_paths=diagram_paths[-2:], examples=examples)
     print(f'Report written to {saved_path}.')
 
-    save_rnn_artifact(best_model, vocabulary, config, best_record.name)
+    save_rnn_artifact(best_model,
+                      vocabulary,
+                      config,
+                      best_record.name,
+                      artifact_dir=config.artifact_dir)
     print(f'Best model ({best_record.name}) saved for the Streamlit app.')
     return 0
 

@@ -8,8 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.fake_news.app_support import TfidfService, describe, format_probabilities, top_prediction
 from src.fake_news.config import class_names
-from src.fake_news.data.dataset import generate_synthetic_liar, label_column, load_liar, \
-    select_text
+from src.fake_news.data.dataset import label_column, load_liar, select_text
 from src.fake_news.inference import PredictionService, artifact_path
 from src.fake_news.models.tfidf_classifier import TfidfLogisticClassifier
 
@@ -31,10 +30,7 @@ def load_service(task: str):
 
 
 def _train_fallback(task: str) -> TfidfService:
-    try:
-        train_df, _, _ = load_liar('data/raw/liar')
-    except FileNotFoundError:
-        train_df = generate_synthetic_liar()
+    train_df, _, _ = load_liar('data/raw/liar')
     column = label_column(task)
     model = TfidfLogisticClassifier().fit(select_text(train_df, False), train_df[column].tolist())
     return TfidfService(model, class_names(task))
