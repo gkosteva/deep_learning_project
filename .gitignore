@@ -37,11 +37,13 @@ data/raw/*.csv
 data/raw/*.txt
 data/processed/
 
-# Generated reports, figures and model artifacts
-reports/*.xlsx
+# Generated model artifacts and experiment ledger (not committed).
+# The xlsx reports and figures ARE committed as a results snapshot.
 reports/records.jsonl
-reports/figures/
 reports/artifacts/
+
+# Local submission archives
+*.zip
 
 # Hugging Face caches
 .cache/
