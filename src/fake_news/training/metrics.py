@@ -7,7 +7,7 @@ def _validate(references: Sequence[int], predictions: Sequence[int]) -> None:
     if len(references) == 0:
         raise ValueError('cannot compute metrics on empty sequences')
 
-
+# number of correct predictions divided by total number of predictions
 def accuracy_score(references: Sequence[int], predictions: Sequence[int]) -> float:
     _validate(references, predictions)
     correct = sum(1 for r, p in zip(references, predictions) if r == p)
@@ -27,9 +27,8 @@ def confusion_matrix(
         matrix[reference][prediction] += 1
     return matrix
 
-
+# Precision, recall and F1 for every class given a confusion matrix.
 def per_class_scores(matrix: Sequence[Sequence[int]]) -> List[Tuple[float, float, float]]:
-    """Precision, recall and F1 for every class given a confusion matrix."""
     size = len(matrix)
     column_sums = [sum(matrix[row][col] for row in range(size)) for col in range(size)]
     row_sums = [sum(row) for row in matrix]
@@ -44,6 +43,7 @@ def per_class_scores(matrix: Sequence[Sequence[int]]) -> List[Tuple[float, float
     return scores
 
 
+# Macro-averaged precision, recall and F1 across all classes.
 def _macro(references: Sequence[int], predictions: Sequence[int],
            num_classes: int) -> Tuple[float, float, float]:
     matrix = confusion_matrix(references, predictions, num_classes)

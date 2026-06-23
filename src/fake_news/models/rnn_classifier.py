@@ -5,10 +5,9 @@ import torch.nn as nn
 
 RNN_TYPES = ('lstm', 'gru')
 
-
+# An embedding + (Bi)LSTM/(Bi)GRU classifier with masked mean pooling.
 class RNNClassifier(nn.Module):
-    """An embedding + (Bi)LSTM/(Bi)GRU classifier with masked mean pooling."""
-
+    
     def __init__(
         self,
         vocab_size: int,

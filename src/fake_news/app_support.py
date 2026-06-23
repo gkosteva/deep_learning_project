@@ -30,9 +30,8 @@ def format_probabilities(ranked: Sequence[Tuple[str, float]]) -> List[Dict[str, 
         'percent': round(float(probability) * 100, 1),
     } for label, probability in ranked]
 
-
+# Wraps a fitted TF-IDF classifier behind the PredictionService interface.
 class TfidfService:
-    """Wraps a fitted TF-IDF classifier behind the PredictionService interface."""
 
     def __init__(self,
                  model,

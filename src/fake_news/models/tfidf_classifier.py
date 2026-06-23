@@ -1,8 +1,7 @@
 from typing import List, Sequence
 
-
+# TF-IDF features fed to a multinomial logistic-regression classifier.
 class TfidfLogisticClassifier:
-    """TF-IDF features fed to a multinomial logistic-regression classifier."""
 
     def __init__(self,
                  max_features: int = 20000,

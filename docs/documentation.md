@@ -159,7 +159,7 @@ deep_learning_project/
   experiments/                 exp_00 exploration .. exp_04 transformers
   tests/                       BDD unit tests (one module per class)
   reports/                     model_report_<task>.xlsx + figures/ + artifacts/
-  docs/                        this file + presentation outline
+  docs/                        this file + presentation.pptx (build_presentation.py)
 ```
 
 ## 8. The Model Report File

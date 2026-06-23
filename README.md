@@ -82,8 +82,9 @@ app/streamlit_app.py  Streamlit web UI
 experiments/          runnable scripts (exploration + experiments)
 tests/                BDD unit tests
 reports/              generated Excel report, figures and model artifacts
-docs/                 full documentation + presentation outline
+docs/                 full documentation + presentation deck (.pptx)
 ```
 
 See [docs/documentation.md](docs/documentation.md) for the full write-up and
-[docs/presentation_outline.md](docs/presentation_outline.md) for the slides.
+[docs/presentation.pptx](docs/presentation.pptx) for the slide deck (regenerate
+with `python docs/build_presentation.py`).

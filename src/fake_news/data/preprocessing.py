@@ -52,7 +52,7 @@ class Vocabulary:
         ids = [self.token_to_id.get(token, self.unk_id) for token in tokenize(text)]
         ids = ids[:max_length]
         padding = [self.pad_id] * (max_length - len(ids))
-        return ids + padding  # for identical lenght tensors
+        return ids + padding # for identical lenght tensors
 
     @classmethod
     def build(
@@ -63,12 +63,11 @@ class Vocabulary:
     ) -> 'Vocabulary':
         counter: Counter = Counter()
         for text in texts:
-            counter.update(
-                tokenize(text))  # takes a list and increments the count of every element
+            counter.update(tokenize(text)) # takes a list and increments the count of every element
 
         token_to_id = {PAD_TOKEN: 0, UNK_TOKEN: 1}
-        eligible = [(token, count) for token, count in counter.items() if count >= min_frequency]
-        eligible.sort(key=lambda item: (-item[1], item[0]))
+        eligible = [(token, count) for token, count in counter.items() if count >= min_frequency] # drop rare words
+        eligible.sort(key=lambda item: (-item[1], item[0])) # rank by frequency
         for token, _ in eligible:
             if len(token_to_id) >= max_size:
                 break

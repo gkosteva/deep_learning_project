@@ -135,7 +135,7 @@ def run_tfidf_experiment(
 
 
 def run_transformer_experiment(name: str, model_name: str, splits, config: ExperimentConfig,
-                               comment: str) -> Optional[ExperimentRecord]:  # pragma: no cover
+                               comment: str) -> Optional[ExperimentRecord]: 
     try:
         from .models.transformer_classifier import fine_tune_transformer
     except ImportError:
@@ -258,7 +258,7 @@ def run(config: Optional[ExperimentConfig] = None, include_transformers: bool = 
     for record, *_ in neural_results:
         report.add(record)
 
-    if include_transformers:  # pragma: no cover
+    if include_transformers: 
         for name, model_name, comment in (
             ('BERT (fine-tuned)', 'bert-base-uncased', 'BERT architecture fine-tuned on LIAR.'),
             ('RoBERTa (fine-tuned)', 'roberta-base', 'RoBERTa architecture fine-tuned on LIAR.'),

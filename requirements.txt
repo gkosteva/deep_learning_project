@@ -16,3 +16,4 @@ pytest
 yapf
 isort
 mypy
+python-pptx

@@ -41,9 +41,8 @@ def save_rnn_artifact(model: RNNClassifier,
     torch.save(payload, path)
     return path
 
-
+# Loads a saved RNN artifact and classifies free-text statements.
 class PredictionService:
-    """Loads a saved RNN artifact and classifies free-text statements."""
 
     def __init__(self, model: RNNClassifier, vocabulary: Vocabulary, labels: List[str],
                  max_length: int, model_name: str):

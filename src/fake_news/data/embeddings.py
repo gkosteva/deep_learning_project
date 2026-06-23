@@ -70,7 +70,8 @@ def train_fasttext(texts: List[str],
                      epochs=epochs)
     return {word: model.wv[word].astype(np.float32) for word in model.wv.index_to_key}
 
-
+# ``word2vec`` / ``fasttext`` are trained on the corpus via gensim
+# ``glove`` is loaded from ``path`` when present, else synthesised.
 def resolve_embeddings(
     kind: str,
     vocabulary: Vocabulary,
@@ -79,17 +80,11 @@ def resolve_embeddings(
     seed: int = 42,
     path: str = '',
 ) -> Tuple[Dict[str, np.ndarray], str]:
-    """Return word vectors for the requested technique with graceful fallbacks.
-
-    - ``word2vec`` / ``fasttext`` are trained on the corpus via gensim; if gensim
-      is unavailable, deterministic stand-in vectors are used instead.
-    - ``glove`` is loaded from ``path`` when present, else synthesised.
-    """
     if kind in ('word2vec', 'fasttext'):
         trainer = train_word2vec if kind == 'word2vec' else train_fasttext
         try:
             return trainer(texts, dim, seed), f'{kind}-trained'
-        except ImportError:  # pragma: no cover - exercised only without gensim installed
+        except ImportError: 
             return synthesize_vectors(vocabulary, dim, seed), f'{kind}-synthetic'
     if kind == 'glove':
         if path and os.path.exists(path):

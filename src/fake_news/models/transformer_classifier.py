@@ -12,7 +12,7 @@ def select_device() -> torch.device:
         return torch.device('cuda')
     return torch.device('cpu')
 
-
+# Fine-tune any HuggingFace sequence-classification model (BERT, RoBERTa, DistilBERT, GPT-2, ...) for `num_classes` labels and return test predictions.
 def fine_tune_transformer(
     train_texts: List[str],
     train_labels: List[int],
@@ -21,8 +21,7 @@ def fine_tune_transformer(
     config: TransformerConfig,
     num_classes: int,
 ) -> Tuple[List[int], Dict[str, float]]:
-    """Fine-tune any HuggingFace sequence-classification model (BERT, RoBERTa,
-    DistilBERT, GPT-2, ...) for `num_classes` labels and return test predictions."""
+    
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     device = select_device()
